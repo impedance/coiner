@@ -8,15 +8,26 @@ Use this file as the repo map for agents. Keep it short and specific.
 - Harness plan (discovery): `docs/harness_plan.md`
 
 ## Fast Commands
-- `make smoke` — fastest verification loop
+- `make smoke` — fastest verification loop (structural + tests)
 - `make agent-smoke` — smoke + optional black-box checks (if wired)
-- `make preflight` — broader verification loop
+- `make preflight` — broader verification loop (structural + lint + typecheck + tests)
+
+## Project Status
+- [x] **EPIC-001: Foundation & Core Capture** — 100% complete.
+- [x] **EPIC-002: Planning & Financial Review** — 100% complete.
+- [/] **EPIC-003: Behavior & Habitation** — Not yet started.
 
 ## Code Map
-- **Entrypoints:** `app/` (Expo Router screens), `src/features/`
+- **Entrypoints:** `app/` (Expo Router screens), `src/db/repositories/`
 - **Core domain logic:** `src/domain/` (calculators, business rules, pure functions)
 - **Boundaries / DTOs / config:** `src/types/` (TypeScript types), `src/lib/` (utilities)
-- **Adapters (I/O):** `src/db/` (SQLite repositories, migrations, seeds)
+- **Adapters (I/O):** `src/db/` (SQLite client, migrations, seeds)
+
+## Documentation & Epics
+- **RFC-001:** `RFC-001-financial-behavior-tracker-mvp.md`
+- **Epic 1 (Core):** `docs/epics/EPIC-001-foundation-and-core.md`
+- **Epic 2 (Planning):** `docs/epics/EPIC-002-planning-and-review.md`
+- **Epic 3 (Behavior):** `docs/epics/EPIC-003-behavior-and-habitation.md`
 
 ## Typing Surfaces
 - **Config boundary:** `src/types/` — domain entity types, transaction types, cycle types

@@ -59,21 +59,21 @@ CREATE TABLE transactions (
 ## Tasks
 
 ### 1. Infrastructure
-- [ ] Initialize Expo project in `./` with TypeScript.
-- [ ] Setup `app/` folder structure (tabs: Today, Plan, Goals, Review, More).
-- [ ] Configure `expo-sqlite` with a base client.
-- [ ] Implement a migration manager (e.g., versioned SQL scripts).
+- [x] Initialize Expo project in `./` with TypeScript.
+- [x] Setup `app/` folder structure (tabs: Today, Plan, Goals, Review, More).
+- [x] Configure `expo-sqlite` with a base client.
+- [x] Implement a migration manager (e.g., versioned SQL scripts).
 
 ### 2. Database Schema (Core)
-- [ ] Create `accounts` table.
-- [ ] Create `categories` table (must include system seed: Reserve, Joy Fund).
-- [ ] Create `transactions` table.
-- [ ] Setup basic repository/DSO layer in `src/db/repositories/`.
+- [x] Create `accounts` table.
+- [x] Create `categories` table (must include system seed: Reserve, Joy Fund).
+- [x] Create `transactions` table.
+- [x] Setup basic repository/DSO layer in `src/db/repositories/`.
 
 ### 3. Core UI
-- [ ] **Today Screen**: Show total balance across accounts and "Unassigned" amount.
-- [ ] **Quick Actions**: "Add Expense" and "Add Income" buttons.
-- [ ] **Add Transaction Screen**: Minimal 3-step flow (Amount -> Account -> Category).
+- [x] **Today Screen**: Show total balance across accounts and "Unassigned" amount.
+- [x] **Quick Actions**: "Add Expense" and "Add Income" buttons.
+- [x] **Add Transaction Screen**: Minimal 3-step flow (Amount -> Account -> Category).
 
 ## Definition of Done
 - App runs on iOS/Android simulator.

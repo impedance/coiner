@@ -67,22 +67,22 @@ CREATE TABLE weekly_reviews (
 ## Tasks
 
 ### 1. Planning Layer (Buckets)
-- [ ] Create `monthly_bucket_plans` table/logic.
-- [ ] **Plan Screen**: List buckets with Available / Assigned / Spent columns.
-- [ ] **Income Allocation Flow**: When income is added, prompt to distribute to Reserve, Joy Fund, or Goals.
+- [x] Create `monthly_bucket_plans` table/logic.
+- [x] **Plan Screen**: List buckets with Available / Assigned / Spent columns.
+- [x] **Income Allocation Flow**: When income is added, prompt to distribute to Reserve, Joy Fund, or Goals.
 
 ### 2. Goals & Artifacts (v1)
-- [ ] Create `goals` and `goal_contributions` tables.
-- [ ] **Goals Screen**: CRUD for goals (Reserve, Purchase, Freedom).
-- [ ] **Integration**: Allow linking a transaction or allocation to a specific goal.
+- [x] Create `goals` and `goal_contributions` tables.
+- [x] **Goals Screen**: CRUD for goals (Reserve, Purchase, Freedom).
+- [x] **Integration**: Allow linking a transaction or allocation to a specific goal.
 
 ### 3. Weekly Review Ritual
-- [ ] Create `weekly_reviews` table.
-- [ ] **Review Screen**:
-  - Show weekly totals (Income vs Expense).
-  - List top 3 overspent categories.
-  - Input for "Reflection" and "Next Focus".
-  - "Complete Review" button.
+- [x] Create `weekly_reviews` table.
+- [x] **Review Screen**:
+  - [x] Show weekly totals (Income vs Expense).
+  - [x] List top 3 overspent categories.
+  - [x] Input for "Reflection" and "Next Focus".
+  - [x] "Complete Review" button.
 
 ## Definition of Done
 - User can assign every dollar to a bucket.

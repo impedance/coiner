@@ -693,6 +693,7 @@ CREATE TABLE practice_checkins (
   FOREIGN KEY (practice_definition_id) REFERENCES practice_definitions(id)
 );
 
+```sql
 CREATE TABLE weekly_reviews (
   id TEXT PRIMARY KEY,
   week_key TEXT NOT NULL UNIQUE,
@@ -709,7 +710,170 @@ CREATE TABLE weekly_reviews (
 );
 ```
 
-### 13.5 Indexing requirements
+### 13.5 Entity Relationship Diagram (ERD)
+
+```mermaid
+erDiagram
+    APP_SETTINGS {
+        string key PK
+        string value
+    }
+    ACCOUNTS {
+        string id PK
+        string name
+        string type
+        string currency
+        int opening_balance_cents
+        int is_archived
+        datetime created_at
+        datetime updated_at
+    }
+    CATEGORIES {
+        string id PK
+        string name
+        string kind
+        string bucket_type
+        string icon
+        int sort_order
+        int is_system
+        int is_archived
+        datetime created_at
+        datetime updated_at
+    }
+    TRANSACTIONS {
+        string id PK
+        string type
+        string account_id FK
+        string to_account_id FK
+        string category_id FK
+        int amount_cents
+        datetime happened_at
+        string note
+        string goal_id FK
+        string money_step_id FK
+        datetime created_at
+        datetime updated_at
+    }
+    MONTHLY_BUCKET_PLANS {
+        string id PK
+        string month_key
+        string category_id FK
+        int planned_cents
+        int assigned_cents
+        string carryover_mode
+        datetime created_at
+        datetime updated_at
+    }
+    GOALS {
+        string id PK
+        string name
+        string goal_type
+        int target_cents
+        int current_cents
+        datetime due_date
+        string status
+        string note
+        datetime created_at
+        datetime updated_at
+    }
+    ARTIFACTS {
+        string id PK
+        string goal_id FK
+        string title
+        string description
+        string image_uri
+        string unlock_rule_type
+        int unlock_amount_cents
+        datetime unlocked_at
+        datetime created_at
+        datetime updated_at
+    }
+    GOAL_CONTRIBUTIONS {
+        string id PK
+        string goal_id FK
+        string transaction_id FK
+        int amount_cents
+        datetime happened_at
+        string note
+        datetime created_at
+    }
+    MONEY_STEPS {
+        string id PK
+        string title
+        string description
+        string step_type
+        string target_frequency
+        int target_value
+        string status
+        datetime started_at
+        datetime achieved_at
+        datetime created_at
+        datetime updated_at
+    }
+    PRACTICE_DEFINITIONS {
+        string id PK
+        string code
+        string title
+        string scope
+        int is_system
+        datetime created_at
+    }
+    CYCLES {
+        string id PK
+        string title
+        int duration_days
+        string mode
+        datetime start_date
+        datetime end_date
+        string status
+        string target_level
+        datetime created_at
+        datetime updated_at
+    }
+    CYCLE_PRACTICES {
+        string id PK
+        string cycle_id FK
+        string practice_definition_id FK
+        int required
+    }
+    PRACTICE_CHECKINS {
+        string id PK
+        string cycle_id FK
+        string practice_definition_id FK
+        datetime checkin_date
+        string status
+        string note
+        datetime created_at
+    }
+    WEEKLY_REVIEWS {
+        string id PK
+        string week_key
+        datetime period_start
+        datetime period_end
+        int income_cents
+        int expense_cents
+        int reserve_delta_cents
+        int joy_delta_cents
+        string reflection
+        string next_focus
+        datetime created_at
+        datetime updated_at
+    }
+
+    ACCOUNTS ||--o{ TRANSACTIONS : "owns"
+    CATEGORIES ||--o{ TRANSACTIONS : "categorizes"
+    GOALS ||--o{ TRANSACTIONS : "linked_to"
+    GOALS ||--o| ARTIFACTS : "has"
+    GOALS ||--o{ GOAL_CONTRIBUTIONS : "receives"
+    TRANSACTIONS ||--o| GOAL_CONTRIBUTIONS : "triggers"
+    CATEGORIES ||--o{ MONTHLY_BUCKET_PLANS : "planned_in"
+    CYCLES ||--o{ CYCLE_PRACTICES : "includes"
+    PRACTICE_DEFINITIONS ||--o{ CYCLE_PRACTICES : "defined_as"
+    CYCLES ||--o{ PRACTICE_CHECKINS : "tracks"
+    PRACTICE_DEFINITIONS ||--o{ PRACTICE_CHECKINS : "logged_as"
+```
+
+### 13.6 Indexing requirements
 
 The implementation must add indexes at minimum for:
 - transactions by date;
@@ -749,7 +913,32 @@ Use a straightforward layered architecture:
 - **Domain layer**: types, calculators, business rules
 - **Persistence layer**: SQLite access, repositories, migrations, seeds
 
-### 15.2 Recommended source layout
+### 15.2 Architecture Diagram
+
+```mermaid
+graph TD
+    UI[UI Layer: React Native / Expo Router] --> Hooks[Feature Hooks: useTransactions, usePlanning, etc.]
+    Hooks --> Domain[Domain Layer: Calculators & Business Rules]
+    Hooks --> Repos[Persistence Layer: Repositories]
+    Repos --> DB[SQLite Database: expo-sqlite]
+    
+    subgraph "External Control"
+        AGENTS[AGENTS.md / RFCs] -.-> UI
+        AGENTS -.-> Domain
+        AGENTS -.-> Repos
+    end
+    
+    subgraph "Data Flow"
+        TransactionInput[User Input] --> UI
+        UI --> Hooks
+        Hooks --> Repos
+        Repos --> DB
+        DB --> Repos
+        Repos --> UI
+    end
+```
+
+### 15.3 Recommended source layout
 
 ```text
 src/
