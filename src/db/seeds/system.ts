@@ -23,4 +23,22 @@ export async function seedSystemData() {
             );
         }
     }
+
+    // Seed system practice definitions
+    const systemPractices = [
+        { code: 'capture_all', title: 'Capture Every Cent', scope: 'daily' },
+        { code: 'reserve_first', title: 'Reserve First (10%)', scope: 'daily' },
+        { code: 'weekly_review', title: 'Weekly Review ritual', scope: 'weekly' },
+        { code: 'joy_check', title: 'Joy Fund Check', scope: 'daily' },
+    ];
+
+    for (const practice of systemPractices) {
+        const existing = await db.getFirstAsync('SELECT id FROM practice_definitions WHERE code = ?', practice.code);
+        if (!existing) {
+            await db.runAsync(
+                'INSERT INTO practice_definitions (id, code, title, scope, is_system, created_at) VALUES (?, ?, ?, ?, 1, ?)',
+                Crypto.randomUUID(), practice.code, practice.title, practice.scope, now
+            );
+        }
+    }
 }

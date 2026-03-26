@@ -1,21 +1,25 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { useGoals } from '../../src/hooks/useGoals';
-import { Goal } from '../../src/types';
+import { useArtifacts } from '../../src/hooks/useArtifacts';
+import { Goal, Artifact } from '../../src/types';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'react-native';
 
 export default function GoalsScreen() {
-    const { goals, loading, createGoal, contribute, updateGoal } = useGoals();
+    const { goals, loading: goalsLoading, createGoal, contribute } = useGoals();
+    const { artifacts, addArtifact, loading: artifactsLoading } = useArtifacts();
     const [modalVisible, setModalVisible] = useState(false);
-    const [modalType, setModalType] = useState<'create' | 'contribute'>('create');
+    const [modalType, setModalType] = useState<'create' | 'contribute' | 'artifact'>('create');
     const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
 
     // Form state
     const [name, setName] = useState('');
     const [target, setTarget] = useState('');
     const [amount, setAmount] = useState('');
+    const [artifactTitle, setArtifactTitle] = useState('');
 
-    if (loading) {
+    if (goalsLoading || artifactsLoading) {
         return (
             <View style={styles.centered}>
                 <ActivityIndicator size="large" color="#007AFF" />
@@ -41,10 +45,22 @@ export default function GoalsScreen() {
         resetForm();
     };
 
+    const handleAddArtifact = async () => {
+        if (!selectedGoal || !artifactTitle) return;
+        await addArtifact({
+            goal_id: selectedGoal.id,
+            title: artifactTitle,
+            unlock_rule_type: 'manual',
+        });
+        setModalVisible(false);
+        resetForm();
+    };
+
     const resetForm = () => {
         setName('');
         setTarget('');
         setAmount('');
+        setArtifactTitle('');
         setSelectedGoal(null);
     };
 
@@ -82,6 +98,33 @@ export default function GoalsScreen() {
                                     <View style={[styles.progressBar, { width: `${Math.min(1, progress) * 100}%` }]} />
                                 </View>
 
+                                {/* Artifacts / Emotional Anchors */}
+                                <View style={styles.artifactsSection}>
+                                    <View style={styles.artifactsHeader}>
+                                        <Text style={styles.artifactsTitle}>Emotional Anchors</Text>
+                                        <TouchableOpacity 
+                                            onPress={() => {
+                                                setSelectedGoal(goal);
+                                                setModalType('artifact');
+                                                setModalVisible(true);
+                                            }}
+                                        >
+                                            <Ionicons name="add-circle-outline" size={20} color="#007AFF" />
+                                        </TouchableOpacity>
+                                    </View>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.artifactsList}>
+                                        {artifacts.filter(a => a.goal_id === goal.id).map(artifact => (
+                                            <View key={artifact.id} style={styles.artifactBadge}>
+                                                <Ionicons name="image-outline" size={16} color="#8E8E93" />
+                                                <Text style={styles.artifactBadgeText}>{artifact.title}</Text>
+                                            </View>
+                                        ))}
+                                        {artifacts.filter(a => a.goal_id === goal.id).length === 0 && (
+                                            <Text style={styles.emptyArtifacts}>Add a photo or note to stay motivated!</Text>
+                                        )}
+                                    </ScrollView>
+                                </View>
+
                                 <View style={styles.goalFooter}>
                                     <Text style={styles.progressText}>
                                         {(goal.current_cents / 100).toFixed(0)}€ of {(goal.target_cents / 100).toFixed(0)}€
@@ -107,10 +150,12 @@ export default function GoalsScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>
-                            {modalType === 'create' ? 'New Goal' : `Contribute to ${selectedGoal?.name}`}
+                            {modalType === 'create' ? 'New Goal' : 
+                             modalType === 'contribute' ? `Contribute to ${selectedGoal?.name}` :
+                             `New Anchor for ${selectedGoal?.name}`}
                         </Text>
 
-                        {modalType === 'create' ? (
+                        {modalType === 'create' && (
                             <>
                                 <TextInput
                                     style={styles.input}
@@ -126,7 +171,9 @@ export default function GoalsScreen() {
                                     onChangeText={setTarget}
                                 />
                             </>
-                        ) : (
+                        )}
+
+                        {modalType === 'contribute' && (
                             <TextInput
                                 style={styles.input}
                                 placeholder="Amount (€)"
@@ -137,13 +184,27 @@ export default function GoalsScreen() {
                             />
                         )}
 
+                        {modalType === 'artifact' && (
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Anchor Title (e.g. Dream House Photo)"
+                                value={artifactTitle}
+                                onChangeText={setArtifactTitle}
+                                autoFocus
+                            />
+                        )}
+
                         <View style={styles.modalButtons}>
                             <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
                                 <Text style={styles.cancelButtonText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.saveButton}
-                                onPress={modalType === 'create' ? handleCreate : handleContribute}
+                                onPress={
+                                    modalType === 'create' ? handleCreate : 
+                                    modalType === 'contribute' ? handleContribute : 
+                                    handleAddArtifact
+                                }
                             >
                                 <Text style={styles.saveButtonText}>
                                     {modalType === 'create' ? 'Create' : 'Add'}
@@ -185,4 +246,11 @@ const styles = StyleSheet.create({
     cancelButtonText: { color: '#8E8E93', fontSize: 16, fontWeight: '600' },
     saveButton: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center', backgroundColor: '#007AFF' },
     saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+    artifactsSection: { marginTop: 16, marginBottom: 16 },
+    artifactsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    artifactsTitle: { fontSize: 13, fontWeight: '600', color: '#8E8E93', textTransform: 'uppercase' },
+    artifactsList: { flexDirection: 'row' },
+    artifactBadge: { backgroundColor: '#F2F2F7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    artifactBadgeText: { fontSize: 12, color: '#3A3A3C' },
+    emptyArtifacts: { fontSize: 12, color: '#C7C7CC', fontStyle: 'italic' },
 });
