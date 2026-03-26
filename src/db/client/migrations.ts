@@ -102,6 +102,73 @@ const MIGRATIONS = [
     updated_at TEXT NOT NULL
   );
   `,
+  // Version 3: Epic 3 - Behavior & Habitation
+  `
+  CREATE TABLE IF NOT EXISTS artifacts (
+    id TEXT PRIMARY KEY,
+    goal_id TEXT,
+    title TEXT NOT NULL,
+    description TEXT,
+    image_uri TEXT,
+    unlock_rule_type TEXT NOT NULL,
+    unlock_amount_cents INTEGER,
+    unlocked_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (goal_id) REFERENCES goals(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS practice_definitions (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    is_system INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS cycles (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    duration_days INTEGER NOT NULL,
+    mode TEXT NOT NULL DEFAULT 'soft',
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    target_level TEXT NOT NULL DEFAULT 'minimum',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS cycle_practices (
+    id TEXT PRIMARY KEY,
+    cycle_id TEXT NOT NULL,
+    practice_definition_id TEXT NOT NULL,
+    required INTEGER NOT NULL DEFAULT 1,
+    UNIQUE (cycle_id, practice_definition_id),
+    FOREIGN KEY (cycle_id) REFERENCES cycles(id),
+    FOREIGN KEY (practice_definition_id) REFERENCES practice_definitions(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS practice_checkins (
+    id TEXT PRIMARY KEY,
+    cycle_id TEXT,
+    practice_definition_id TEXT NOT NULL,
+    checkin_date TEXT NOT NULL,
+    status TEXT NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (cycle_id, practice_definition_id, checkin_date),
+    FOREIGN KEY (cycle_id) REFERENCES cycles(id),
+    FOREIGN KEY (practice_definition_id) REFERENCES practice_definitions(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  `,
 ];
 
 export async function migrate() {

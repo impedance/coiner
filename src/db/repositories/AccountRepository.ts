@@ -15,7 +15,7 @@ export class AccountRepository {
 
         await db.runAsync(
             'INSERT INTO accounts (id, name, type, currency, opening_balance_cents, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            id, account.name, account.type, account.currency, account.opening_balance_cents ?? 0, 0, now, now
+            id, account.name ?? '', account.type ?? 'other', account.currency ?? 'USD', account.opening_balance_cents ?? 0, 0, now, now
         );
 
         return id;

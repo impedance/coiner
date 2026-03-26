@@ -82,3 +82,61 @@ export interface WeeklyReview {
     created_at: string;
     updated_at: string;
 }
+
+export interface Artifact {
+    id: string;
+    goal_id?: string;
+    title: string;
+    description?: string;
+    image_uri?: string;
+    unlock_rule_type: 'amount_reached' | 'manual';
+    unlock_amount_cents?: number;
+    unlocked_at?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PracticeDefinition {
+    id: string;
+    code: string;
+    title: string;
+    scope: 'daily' | 'weekly' | 'monthly';
+    is_system: boolean;
+    created_at: string;
+}
+
+export interface Cycle {
+    id: string;
+    title: string;
+    duration_days: number;
+    mode: 'soft' | 'hard';
+    start_date: string;
+    end_date: string;
+    status: 'active' | 'completed' | 'failed';
+    target_level: 'minimum' | 'target' | 'hero';
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CyclePractice {
+    id: string;
+    cycle_id: string;
+    practice_definition_id: string;
+    required: boolean;
+}
+
+export interface PracticeCheckin {
+    id: string;
+    cycle_id?: string;
+    practice_definition_id: string;
+    checkin_date: string; // 'YYYY-MM-DD'
+    status: 'done' | 'missed';
+    note?: string;
+    created_at: string;
+}
+
+export interface AppSetting {
+    key: string;
+    value: string;
+    updated_at: string;
+}

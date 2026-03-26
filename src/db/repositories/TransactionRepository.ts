@@ -15,7 +15,7 @@ export class TransactionRepository {
 
         await db.runAsync(
             'INSERT INTO transactions (id, type, account_id, to_account_id, category_id, amount_cents, happened_at, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            id, tx.type, tx.account_id, tx.to_account_id ?? null, tx.category_id ?? null, tx.amount_cents ?? 0, tx.happened_at || now, tx.note ?? null, now, now
+            id, tx.type ?? 'expense', tx.account_id ?? '', tx.to_account_id ?? null, tx.category_id ?? null, tx.amount_cents ?? 0, tx.happened_at || now, tx.note ?? null, now, now
         );
 
         return id;
