@@ -40,8 +40,8 @@ export class WeeklyReviewRepository {
                 review.expense_cents ?? existing.expense_cents,
                 review.reserve_delta_cents ?? existing.reserve_delta_cents,
                 review.joy_delta_cents ?? existing.joy_delta_cents,
-                review.reflection ?? existing.reflection,
-                review.next_focus ?? existing.next_focus,
+                review.reflection ?? existing.reflection ?? null,
+                review.next_focus ?? existing.next_focus ?? null,
                 now,
                 existing.id
             );
@@ -60,8 +60,8 @@ export class WeeklyReviewRepository {
                 review.expense_cents ?? 0,
                 review.reserve_delta_cents ?? 0,
                 review.joy_delta_cents ?? 0,
-                review.reflection,
-                review.next_focus,
+                review.reflection ?? null,
+                review.next_focus ?? null,
                 now,
                 now
             );

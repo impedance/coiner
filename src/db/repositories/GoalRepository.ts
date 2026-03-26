@@ -25,9 +25,9 @@ export class GoalRepository {
             goal.goal_type,
             goal.target_cents ?? 0,
             goal.current_cents ?? 0,
-            goal.due_date,
+            goal.due_date ?? null,
             goal.status ?? 'active',
-            goal.note,
+            goal.note ?? null,
             now,
             now
         );
@@ -71,8 +71,8 @@ export class GoalRepository {
                 contribution.goal_id,
                 contribution.transaction_id,
                 contribution.amount_cents,
-                contribution.happened_at ?? now,
-                contribution.note,
+                contribution.happened_at || now,
+                contribution.note ?? null,
                 now
             );
 

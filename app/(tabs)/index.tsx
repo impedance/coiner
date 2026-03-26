@@ -1,10 +1,23 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useDataSelection } from '../../src/hooks/useData';
+import { usePlanning } from '../../src/hooks/usePlanning';
+import { useGoals } from '../../src/hooks/useGoals';
 import { router } from 'expo-router';
 
 export default function TodayScreen() {
-    const { isReady, accounts, transactions, refresh } = useDataSelection();
+    const { isReady: isDataReady, accounts, transactions } = useDataSelection();
+
+    // Get current month key (YYYY-MM)
+    const monthKey = useMemo(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }, []);
+
+    const { unassignedMoney, loading: planningLoading } = usePlanning(monthKey);
+    const { goals, loading: goalsLoading } = useGoals();
+
+    const isReady = isDataReady && !planningLoading && !goalsLoading;
 
     if (!isReady) {
         return (
@@ -14,9 +27,8 @@ export default function TodayScreen() {
         );
     }
 
-    const totalBalance = accounts.reduce((sum, acc) => sum + acc.opening_balance_cents, 0);
-    // Simple unassigned logic for MVP: everything not in a specific goal/bucket (will expand in Epic 2)
-    const unassigned = totalBalance;
+    const totalBalance = accounts.reduce((sum, acc) => sum + acc.opening_balance_cents, 0) +
+        transactions.reduce((sum, tx) => sum + (tx.type === 'income' ? tx.amount_cents : (tx.type === 'expense' ? -tx.amount_cents : 0)), 0);
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -26,7 +38,7 @@ export default function TodayScreen() {
 
                 <View style={styles.unassignedRow}>
                     <Text style={styles.unassignedLabel}>Unassigned:</Text>
-                    <Text style={styles.unassignedAmount}>{(unassigned / 100).toFixed(2)} €</Text>
+                    <Text style={styles.unassignedAmount}>{(unassignedMoney / 100).toFixed(2)} €</Text>
                 </View>
             </View>
 
