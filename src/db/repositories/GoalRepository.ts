@@ -5,7 +5,7 @@ import * as Crypto from 'expo-crypto';
 export class GoalRepository {
     async getAll(): Promise<Goal[]> {
         const db = await getDatabase();
-        return db.getAllAsync<Goal>('SELECT * FROM goals WHERE status != "archived" ORDER BY created_at DESC');
+        return db.getAllAsync<Goal>('SELECT * FROM goals WHERE status != \'archived\' ORDER BY created_at DESC');
     }
 
     async getById(id: string): Promise<Goal | null> {

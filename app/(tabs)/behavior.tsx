@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     content: { padding: 20, paddingTop: 60 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     title: { fontSize: 34, fontWeight: 'bold', marginBottom: 24 },
-    cycleCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+    cycleCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, elevation: 5, boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.1)' },
     cycleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
     cycleTitle: { fontSize: 22, fontWeight: '700' },
     cycleSub: { color: '#8E8E93', fontSize: 14, marginTop: 2 },

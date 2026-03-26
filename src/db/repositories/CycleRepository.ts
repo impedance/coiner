@@ -5,7 +5,7 @@ import * as Crypto from 'expo-crypto';
 export class CycleRepository {
     async getActiveCycle(): Promise<Cycle | null> {
         const db = await getDatabase();
-        return db.getFirstAsync<Cycle>('SELECT * FROM cycles WHERE status = "active" LIMIT 1');
+        return db.getFirstAsync<Cycle>('SELECT * FROM cycles WHERE status = \'active\' LIMIT 1');
     }
 
     async getAll(): Promise<Cycle[]> {
@@ -25,7 +25,7 @@ export class CycleRepository {
 
         await db.withTransactionAsync(async () => {
             // Deactivate any existing active cycles
-            await db.runAsync('UPDATE cycles SET status = "completed", updated_at = ? WHERE status = "active"', now);
+            await db.runAsync('UPDATE cycles SET status = \'completed\', updated_at = ? WHERE status = \'active\'', now);
 
             await db.runAsync(
                 'INSERT INTO cycles (id, title, duration_days, mode, start_date, end_date, status, target_level, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',

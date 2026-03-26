@@ -140,3 +140,15 @@ export interface AppSetting {
     value: string;
     updated_at: string;
 }
+
+export interface MoneyStep {
+    id: string;
+    title: string;
+    description?: string;
+    step_type: string;
+    status: 'active' | 'achieved' | 'archived';
+    started_at: string;
+    achieved_at?: string;
+    created_at: string;
+    updated_at: string;
+}

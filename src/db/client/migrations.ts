@@ -169,6 +169,20 @@ const MIGRATIONS = [
     updated_at TEXT NOT NULL
   );
   `,
+  // Version 4: Money Steps
+  `
+  CREATE TABLE IF NOT EXISTS money_steps (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    step_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    started_at TEXT NOT NULL,
+    achieved_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  `,
 ];
 
 export async function migrate() {
