@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useDataSelection } from '../../src/hooks/useData';
 import { accountRepository } from '../../src/db/repositories/AccountRepository';
+import { useExport } from '../../src/hooks/useExport';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SettingsScreen() {
     const { accounts, isReady, refresh } = useDataSelection();
+    const { exportJSON, exportCSV, importJSON, loading: exportLoading } = useExport();
     const [name, setName] = useState('');
     const [balance, setBalance] = useState('');
 
@@ -36,6 +39,7 @@ export default function SettingsScreen() {
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
             <Text style={styles.title}>Settings</Text>
 
+            {/* Accounts Section */}
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Accounts</Text>
                 {accounts.map(acc => (
@@ -66,9 +70,51 @@ export default function SettingsScreen() {
                 </View>
             </View>
 
+            {/* App Preferences Section */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Preferences</Text>
+                <TouchableOpacity style={styles.item} onPress={() => Alert.alert('Currency', 'Currently only EUR is supported in MVP.')}>
+                    <Text style={styles.itemName}>Primary Currency</Text>
+                    <View style={styles.itemRight}>
+                        <Text style={styles.itemValue}>EUR (€)</Text>
+                        <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
+                    </View>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.item} onPress={() => Alert.alert('Week Start', 'Currently fixed to Monday.')}>
+                    <Text style={styles.itemName}>Week Starts On</Text>
+                    <View style={styles.itemRight}>
+                        <Text style={styles.itemValue}>Monday</Text>
+                        <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
+                    </View>
+                </TouchableOpacity>
+            </View>
+
+            {/* Data Management Section */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Data & Portability</Text>
+                {exportLoading ? (
+                    <ActivityIndicator size="small" color="#007AFF" style={{ marginVertical: 20 }} />
+                ) : (
+                    <>
+                        <TouchableOpacity style={styles.actionItem} onPress={exportJSON}>
+                            <Ionicons name="cloud-download-outline" size={22} color="#007AFF" />
+                            <Text style={styles.actionText}>Export JSON Backup</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionItem} onPress={() => importJSON(refresh)}>
+                            <Ionicons name="cloud-upload-outline" size={22} color="#5856D6" />
+                            <Text style={[styles.actionText, { color: '#5856D6' }]}>Import JSON Backup</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionItem} onPress={exportCSV}>
+                            <Ionicons name="list-outline" size={22} color="#34C759" />
+                            <Text style={[styles.actionText, { color: '#34C759' }]}>Export Transactions (CSV)</Text>
+                        </TouchableOpacity>
+                    </>
+                )}
+            </View>
+
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>App Info</Text>
-                <Text style={styles.infoText}>Moneywork MVP v1.0.0</Text>
+                <Text style={styles.infoText}>Moneywork MVP v1.1.0</Text>
                 <Text style={styles.infoText}>Local-first Financial Behavior Tracker</Text>
             </View>
         </ScrollView>
@@ -76,74 +122,21 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F2F2F7',
-    },
-    content: {
-        padding: 20,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        marginBottom: 24,
-    },
-    section: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: 16,
-        color: '#000',
-    },
-    item: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F2F2F7',
-    },
-    itemName: {
-        fontSize: 16,
-    },
-    itemValue: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#8E8E93',
-    },
-    addForm: {
-        marginTop: 20,
-        gap: 12,
-    },
-    formTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    input: {
-        backgroundColor: '#F2F2F7',
-        padding: 12,
-        borderRadius: 8,
-        fontSize: 16,
-    },
-    addButton: {
-        backgroundColor: '#007AFF',
-        padding: 14,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    addButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    infoText: {
-        color: '#8E8E93',
-        marginBottom: 4,
-    },
+    container: { flex: 1, backgroundColor: '#F2F2F7' },
+    content: { padding: 20, paddingTop: 60 },
+    title: { fontSize: 34, fontWeight: 'bold', marginBottom: 24 },
+    section: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 24 },
+    sectionTitle: { fontSize: 13, fontWeight: '600', color: '#8E8E93', textTransform: 'uppercase', marginBottom: 12 },
+    item: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
+    itemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    itemName: { fontSize: 16 },
+    itemValue: { fontSize: 16, color: '#8E8E93' },
+    addForm: { marginTop: 20, gap: 12 },
+    formTitle: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+    input: { backgroundColor: '#F2F2F7', padding: 12, borderRadius: 8, fontSize: 16 },
+    addButton: { backgroundColor: '#007AFF', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 8 },
+    addButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+    actionItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
+    actionText: { fontSize: 16, color: '#007AFF', fontWeight: '500' },
+    infoText: { color: '#C7C7CC', fontSize: 12, marginBottom: 4 },
 });

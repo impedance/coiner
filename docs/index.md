@@ -15,7 +15,7 @@ Use this file as the repo map for agents. Keep it short and specific.
 ## Project Status
 - [x] **EPIC-001: Foundation & Core Capture** — 100% complete.
 - [x] **EPIC-002: Planning & Financial Review** — 100% complete.
-- [/] **EPIC-003: Behavior & Habitation** — Not yet started.
+- [/] **EPIC-003: Behavior & Integration** — 65% complete.
 
 ## Code Map
 - **Entrypoints:** `app/` (Expo Router screens), `src/db/repositories/`
@@ -27,7 +27,7 @@ Use this file as the repo map for agents. Keep it short and specific.
 - **RFC-001:** `RFC-001-financial-behavior-tracker-mvp.md`
 - **Epic 1 (Core):** `docs/epics/EPIC-001-foundation-and-core.md`
 - **Epic 2 (Planning):** `docs/epics/EPIC-002-planning-and-review.md`
-- **Epic 3 (Behavior):** `docs/epics/EPIC-003-behavior-and-habitation.md`
+- **Epic 3 (Behavior):** `docs/epics/EPIC-003-behavior-and-integration.md`
 
 ## Typing Surfaces
 - **Config boundary:** `src/types/` — domain entity types, transaction types, cycle types
