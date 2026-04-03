@@ -4,21 +4,35 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useDataSelection } from '../../src/hooks/useData';
 import { transactionRepository } from '../../src/db/repositories/TransactionRepository';
 
+type TransactionType = 'expense' | 'income' | 'transfer';
+
 export default function NewTransactionScreen() {
-    const { type } = useLocalSearchParams<{ type: 'expense' | 'income' }>();
+    const { type: initialType } = useLocalSearchParams<{ type: TransactionType }>();
     const { accounts, categories, isReady, refresh } = useDataSelection();
 
+    const [type, setType] = useState<TransactionType>(initialType || 'expense');
     const [step, setStep] = useState(1);
     const [amount, setAmount] = useState('');
     const [accountId, setAccountId] = useState('');
+    const [toAccountId, setToAccountId] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [note, setNote] = useState('');
 
-    const filteredCategories = categories.filter(c => c.kind === type);
+    const filteredCategories = categories.filter(c => c.kind === type || (type === 'transfer' && c.kind === 'expense'));
 
     const handleSave = async () => {
-        if (!amount || !accountId || !categoryId) {
-            Alert.alert('Missing Info', 'Please fill in all fields.');
+        if (!amount || !accountId) {
+            Alert.alert('Missing Info', 'Please fill in all required fields.');
+            return;
+        }
+
+        if (type === 'transfer' && !toAccountId) {
+            Alert.alert('Missing Info', 'Please select a destination account.');
+            return;
+        }
+
+        if (type !== 'transfer' && !categoryId) {
+            Alert.alert('Missing Info', 'Please select a category.');
             return;
         }
 
@@ -27,7 +41,8 @@ export default function NewTransactionScreen() {
                 type,
                 amount_cents: Math.round(parseFloat(amount.replace(',', '.')) * 100),
                 account_id: accountId,
-                category_id: categoryId,
+                to_account_id: type === 'transfer' ? toAccountId : undefined,
+                category_id: type !== 'transfer' ? categoryId : undefined,
                 note,
                 happened_at: new Date().toISOString(),
             });
@@ -40,9 +55,39 @@ export default function NewTransactionScreen() {
 
     if (!isReady) return null;
 
+    const getTitle = () => {
+        switch (type) {
+            case 'income': return 'Add Income';
+            case 'transfer': return 'Transfer Money';
+            default: return 'Add Expense';
+        }
+    };
+
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-            <Text style={styles.title}>Add {type === 'expense' ? 'Expense' : 'Income'}</Text>
+            <Text style={styles.title}>{getTitle()}</Text>
+
+            {/* Type Selector */}
+            <View style={styles.typeSelector}>
+                <TouchableOpacity
+                    style={[styles.typeButton, type === 'expense' && styles.typeButtonActive]}
+                    onPress={() => setType('expense')}
+                >
+                    <Text style={[styles.typeButtonText, type === 'expense' && styles.typeButtonTextActive]}>Expense</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.typeButton, type === 'income' && styles.typeButtonActive]}
+                    onPress={() => setType('income')}
+                >
+                    <Text style={[styles.typeButtonText, type === 'income' && styles.typeButtonTextActive]}>Income</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.typeButton, type === 'transfer' && styles.typeButtonActive]}
+                    onPress={() => setType('transfer')}
+                >
+                    <Text style={[styles.typeButtonText, type === 'transfer' && styles.typeButtonTextActive]}>Transfer</Text>
+                </TouchableOpacity>
+            </View>
 
             {step === 1 && (
                 <View style={styles.step}>
@@ -63,7 +108,9 @@ export default function NewTransactionScreen() {
 
             {step === 2 && (
                 <View style={styles.step}>
-                    <Text style={styles.label}>From which account?</Text>
+                    <Text style={styles.label}>
+                        {type === 'transfer' ? 'From which account?' : 'Which account?'}
+                    </Text>
                     {accounts.length === 0 ? (
                         <Text style={styles.emptyText}>No accounts found. Create one in Settings.</Text>
                     ) : (
@@ -73,7 +120,7 @@ export default function NewTransactionScreen() {
                                 style={[styles.option, accountId === acc.id && styles.optionSelected]}
                                 onPress={() => {
                                     setAccountId(acc.id);
-                                    setStep(3);
+                                    setStep(type === 'transfer' ? 3 : 4);
                                 }}
                             >
                                 <Text style={[styles.optionText, accountId === acc.id && styles.optionTextSelected]}>
@@ -88,7 +135,36 @@ export default function NewTransactionScreen() {
                 </View>
             )}
 
-            {step === 3 && (
+            {/* Transfer: To Account Selection */}
+            {step === 3 && type === 'transfer' && (
+                <View style={styles.step}>
+                    <Text style={styles.label}>To which account?</Text>
+                    {accounts.filter(a => a.id !== accountId).length === 0 ? (
+                        <Text style={styles.emptyText}>Need at least 2 accounts for transfer.</Text>
+                    ) : (
+                        accounts.filter(a => a.id !== accountId).map(acc => (
+                            <TouchableOpacity
+                                key={acc.id}
+                                style={[styles.option, toAccountId === acc.id && styles.optionSelected]}
+                                onPress={() => {
+                                    setToAccountId(acc.id);
+                                    setStep(5);
+                                }}
+                            >
+                                <Text style={[styles.optionText, toAccountId === acc.id && styles.optionTextSelected]}>
+                                    {acc.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))
+                    )}
+                    <TouchableOpacity style={styles.backButton} onPress={() => setStep(2)}>
+                        <Text style={styles.backButtonText}>Back</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Category Selection (for expense/income) */}
+            {step === 4 && type !== 'transfer' && (
                 <View style={styles.step}>
                     <Text style={styles.label}>Which category?</Text>
                     <View style={styles.grid}>
@@ -108,7 +184,7 @@ export default function NewTransactionScreen() {
                     <Text style={[styles.label, { marginTop: 20 }]}>Optional Note</Text>
                     <TextInput
                         style={styles.input}
-                        placeholder="Coffee, rent, salary..."
+                        placeholder={type === 'expense' ? "Coffee, rent, groceries..." : "Salary, gift, refund..."}
                         value={note}
                         onChangeText={setNote}
                     />
@@ -117,6 +193,35 @@ export default function NewTransactionScreen() {
                         <Text style={styles.saveButtonText}>Save Transaction</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.backButton} onPress={() => setStep(2)}>
+                        <Text style={styles.backButtonText}>Back</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Transfer Summary Step */}
+            {step === 5 && type === 'transfer' && (
+                <View style={styles.step}>
+                    <Text style={styles.label}>Transfer Details</Text>
+                    <View style={styles.transferSummary}>
+                        <Text style={styles.transferText}>
+                            {amount ? `${parseFloat(amount).toFixed(2)} €` : '0.00 €'}
+                        </Text>
+                        <Text style={styles.transferLabel}>From: {accounts.find(a => a.id === accountId)?.name}</Text>
+                        <Text style={styles.transferLabel}>To: {accounts.find(a => a.id === toAccountId)?.name}</Text>
+                    </View>
+
+                    <Text style={[styles.label, { marginTop: 20 }]}>Optional Note</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Transfer note..."
+                        value={note}
+                        onChangeText={setNote}
+                    />
+
+                    <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+                        <Text style={styles.saveButtonText}>Confirm Transfer</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.backButton} onPress={() => setStep(3)}>
                         <Text style={styles.backButtonText}>Back</Text>
                     </TouchableOpacity>
                 </View>
@@ -136,7 +241,30 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        marginBottom: 32,
+        marginBottom: 24,
+    },
+    typeSelector: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 24,
+    },
+    typeButton: {
+        flex: 1,
+        padding: 12,
+        borderRadius: 10,
+        backgroundColor: '#F2F2F7',
+        alignItems: 'center',
+    },
+    typeButtonActive: {
+        backgroundColor: '#007AFF',
+    },
+    typeButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#3A3A3C',
+    },
+    typeButtonTextActive: {
+        color: '#FFFFFF',
     },
     step: {
         gap: 16,
@@ -217,5 +345,21 @@ const styles = StyleSheet.create({
     emptyText: {
         color: '#FF3B30',
         marginBottom: 10,
+    },
+    transferSummary: {
+        backgroundColor: '#F2F2F7',
+        padding: 20,
+        borderRadius: 12,
+        gap: 8,
+    },
+    transferText: {
+        fontSize: 32,
+        fontWeight: 'bold',
+        color: '#007AFF',
+        marginBottom: 12,
+    },
+    transferLabel: {
+        fontSize: 16,
+        color: '#3A3A3C',
     },
 });

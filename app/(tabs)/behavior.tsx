@@ -2,12 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Modal, FlatList } from 'react-native';
 import { useBehavior } from '../../src/hooks/useBehavior';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { PracticeDefinition } from '../../src/types';
 
 export default function BehaviorScreen() {
-    const { activeCycle, definitions, checkins, loading, startCycle, toggleCheckin } = useBehavior();
+    const { activeCycle, definitions, checkins, streak, loading, startCycle, toggleCheckin, completeCycle } = useBehavior();
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedPracticeIds, setSelectedPracticeIds] = useState<string[]>([]);
+    const [showCompleteModal, setShowCompleteModal] = useState(false);
+    const router = useRouter();
 
     const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
@@ -59,7 +62,7 @@ export default function BehaviorScreen() {
                         </View>
                         <View style={styles.streakContainer}>
                             <Ionicons name="flame" size={24} color="#FF9500" />
-                            <Text style={styles.streakText}>7</Text> 
+                            <Text style={styles.streakText}>{streak}</Text>
                         </View>
                     </View>
 
@@ -88,6 +91,13 @@ export default function BehaviorScreen() {
                             </TouchableOpacity>
                         );
                     })}
+
+                    <TouchableOpacity
+                        style={styles.completeCycleButton}
+                        onPress={() => setShowCompleteModal(true)}
+                    >
+                        <Text style={styles.completeCycleButtonText}>Complete Cycle</Text>
+                    </TouchableOpacity>
                 </View>
             ) : (
                 <View style={styles.emptyState}>
@@ -106,6 +116,20 @@ export default function BehaviorScreen() {
                     </TouchableOpacity>
                 </View>
             )}
+
+            <TouchableOpacity 
+                style={styles.moneyStepsLink}
+                onPress={() => router.push('/more/money-steps')}
+            >
+                <View style={styles.moneyStepsIcon}>
+                    <Ionicons name="trending-up" size={24} color="#007AFF" />
+                </View>
+                <View style={styles.moneyStepsText}>
+                    <Text style={styles.moneyStepsTitle}>Money Steps</Text>
+                    <Text style={styles.moneyStepsSub}>Track your lifestyle upgrades</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+            </TouchableOpacity>
 
             <Modal visible={modalVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
@@ -140,6 +164,45 @@ export default function BehaviorScreen() {
                                 <Text style={styles.confirmButtonText}>Start 21-Day Cycle</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Complete Cycle Modal */}
+            <Modal visible={showCompleteModal} animationType="slide" transparent>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Complete Cycle</Text>
+                        <Text style={styles.modalSub}>How did you do?</Text>
+
+                        <TouchableOpacity
+                            style={[styles.completeOption, { backgroundColor: '#34C759' }]}
+                            onPress={() => {
+                                completeCycle('completed');
+                                setShowCompleteModal(false);
+                            }}
+                        >
+                            <Ionicons name="trophy" size={24} color="#FFFFFF" />
+                            <Text style={styles.completeOptionText}>Successfully Completed</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.completeOption, { backgroundColor: '#FF3B30', marginTop: 12 }]}
+                            onPress={() => {
+                                completeCycle('failed');
+                                setShowCompleteModal(false);
+                            }}
+                        >
+                            <Ionicons name="refresh" size={24} color="#FFFFFF" />
+                            <Text style={styles.completeOptionText}>Start Fresh (Reset)</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.cancelButton}
+                            onPress={() => setShowCompleteModal(false)}
+                        >
+                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -183,4 +246,14 @@ const styles = StyleSheet.create({
     confirmButton: { flex: 2, padding: 16, borderRadius: 12, alignItems: 'center', backgroundColor: '#007AFF' },
     confirmButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
     disabledButton: { opacity: 0.5 },
+    moneyStepsLink: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginTop: 24, marginBottom: 40, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 4 },
+    moneyStepsIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' },
+    moneyStepsText: { flex: 1, marginLeft: 16 },
+    moneyStepsTitle: { fontSize: 17, fontWeight: '700', color: '#1C1C1E' },
+    moneyStepsSub: { fontSize: 14, color: '#8E8E93', marginTop: 2 },
+    completeCycleButton: { marginTop: 20, padding: 16, borderRadius: 12, backgroundColor: '#F2F2F7', alignItems: 'center' },
+    completeCycleButtonText: { color: '#007AFF', fontSize: 16, fontWeight: '600' },
+    modalSub: { fontSize: 14, color: '#8E8E93', marginBottom: 20 },
+    completeOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 12, gap: 8 },
+    completeOptionText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 });

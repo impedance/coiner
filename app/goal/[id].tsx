@@ -1,18 +1,69 @@
-import React from 'react';
-import { StyleSheet, Text, View, ScrollView, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, TextInput, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useGoals } from '../../src/hooks/useGoals';
 import { useArtifacts } from '../../src/hooks/useArtifacts';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function GoalDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const { goals, contribute, loading: goalsLoading } = useGoals();
-    const { artifacts, loading: artifactsLoading } = useArtifacts();
+    const { artifacts, loading: artifactsLoading, addArtifact } = useArtifacts(id);
     const router = useRouter();
 
+    const [modalVisible, setModalVisible] = useState(false);
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [imageUri, setImageUri] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
+
     const goal = goals.find(g => g.id === id);
-    const goalArtifacts = artifacts.filter(a => a.goal_id === id);
+    const goalArtifacts = artifacts;
+
+    const pickImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission Denied', 'We need camera roll permissions to upload images.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [16, 9],
+            quality: 0.8,
+        });
+
+        if (!result.canceled) {
+            setImageUri(result.assets[0].uri);
+        }
+    };
+
+    const handleSaveArtifact = async () => {
+        if (!title) {
+            Alert.alert('Missing Title', 'Please provide a title for the anchor.');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            await addArtifact({
+                title,
+                description,
+                image_uri: imageUri || undefined,
+                unlock_rule_type: 'manual',
+            });
+            setModalVisible(false);
+            setTitle('');
+            setDescription('');
+            setImageUri(null);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to save anchor.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     if (goalsLoading || artifactsLoading) {
         return (
@@ -92,7 +143,10 @@ export default function GoalDetailScreen() {
                     </View>
                 ))}
                 
-                <TouchableOpacity style={styles.addAnchorButton}>
+                <TouchableOpacity 
+                    style={styles.addAnchorButton}
+                    onPress={() => setModalVisible(true)}
+                >
                     <Ionicons name="add-circle" size={20} color="#007AFF" />
                     <Text style={styles.addAnchorText}>Add New Anchor</Text>
                 </TouchableOpacity>
@@ -103,6 +157,57 @@ export default function GoalDetailScreen() {
                 <Text style={styles.sectionTitle}>Recent Contributions</Text>
                 <Text style={styles.placeholderText}>Contributions will appear here.</Text>
             </View>
+
+            <Modal visible={modalVisible} animationType="slide" transparent>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>New Emotional Anchor</Text>
+                            <TouchableOpacity onPress={() => setModalVisible(false)}>
+                                <Ionicons name="close" size={24} color="#8E8E93" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity style={styles.imageSelector} onPress={pickImage}>
+                            {imageUri ? (
+                                <Image source={{ uri: imageUri }} style={styles.selectedImage} />
+                            ) : (
+                                <View style={styles.imagePlaceholder}>
+                                    <Ionicons name="camera" size={32} color="#007AFF" />
+                                    <Text style={styles.imagePlaceholderText}>Choose Photo</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Anchor Title (e.g. My Dream House)"
+                            value={title}
+                            onChangeText={setTitle}
+                        />
+
+                        <TextInput
+                            style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                            placeholder="Why does this inspire you?"
+                            multiline
+                            value={description}
+                            onChangeText={setDescription}
+                        />
+
+                        <TouchableOpacity 
+                            style={[styles.saveButton, saving && styles.disabledButton]} 
+                            onPress={handleSaveArtifact}
+                            disabled={saving}
+                        >
+                            {saving ? (
+                                <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.saveButtonText}>Save Anchor</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </ScrollView>
     );
 }
@@ -139,4 +244,16 @@ const styles = StyleSheet.create({
     artifactNote: { fontSize: 14, color: '#8E8E93', marginTop: 2 },
     addAnchorButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, gap: 8 },
     addAnchorText: { color: '#007AFF', fontWeight: '600', fontSize: 15 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { fontSize: 20, fontWeight: '700' },
+    imageSelector: { height: 180, backgroundColor: '#F2F2F7', borderRadius: 16, overflow: 'hidden', marginBottom: 20, justifyContent: 'center', alignItems: 'center' },
+    selectedImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+    imagePlaceholder: { alignItems: 'center' },
+    imagePlaceholderText: { color: '#007AFF', marginTop: 8, fontWeight: '600' },
+    input: { backgroundColor: '#F2F2F7', borderRadius: 12, padding: 16, fontSize: 16, marginBottom: 12 },
+    saveButton: { backgroundColor: '#007AFF', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+    saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+    disabledButton: { opacity: 0.6 },
 });

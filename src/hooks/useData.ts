@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { accountRepository } from '../db/repositories/AccountRepository';
 import { transactionRepository } from '../db/repositories/TransactionRepository';
 import { categoryRepository } from '../db/repositories/CategoryRepository';
-import { Account, Transaction, Category } from '../types';
+import { monthlyBucketPlanRepository } from '../db/repositories/MonthlyBucketPlanRepository';
+import { Account, Transaction, Category, MonthlyBucketPlan } from '../types';
 import { migrate } from '../db/client/migrations';
 import { seedSystemData } from '../db/seeds/system';
 
@@ -11,16 +12,20 @@ export function useDataSelection() {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [plans, setPlans] = useState<MonthlyBucketPlan[]>([]);
 
     const refresh = useCallback(async () => {
-        const [accs, txs, cats] = await Promise.all([
+        const monthKey = new Date().toISOString().substring(0, 7);
+        const [accs, txs, cats, pls] = await Promise.all([
             accountRepository.getAll(),
             transactionRepository.getAll(),
             categoryRepository.getAll(),
+            monthlyBucketPlanRepository.getByMonth(monthKey),
         ]);
         setAccounts(accs);
         setTransactions(txs);
         setCategories(cats);
+        setPlans(pls);
     }, []);
 
     useEffect(() => {
@@ -33,5 +38,5 @@ export function useDataSelection() {
         init();
     }, [refresh]);
 
-    return { isReady, accounts, transactions, categories, refresh };
+    return { isReady, accounts, transactions, categories, plans, refresh };
 }

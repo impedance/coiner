@@ -14,7 +14,7 @@ export function useExport() {
             const data = await backupRepository.exportAll();
             const json = JSON.stringify(data, null, 2);
             const filename = `moneywork_backup_${new Date().toISOString().split('T')[0]}.json`;
-            const fileUri = `${FileSystem.documentDirectory}${filename}`;
+            const fileUri = `${(FileSystem as any).documentDirectory}${filename}`;
 
             await FileSystem.writeAsStringAsync(fileUri, json);
             await Sharing.shareAsync(fileUri);
@@ -31,7 +31,7 @@ export function useExport() {
         try {
             const csv = await backupRepository.exportTransactionsCSV();
             const filename = `moneywork_transactions_${new Date().toISOString().split('T')[0]}.csv`;
-            const fileUri = `${FileSystem.documentDirectory}${filename}`;
+            const fileUri = `${(FileSystem as any).documentDirectory}${filename}`;
 
             await FileSystem.writeAsStringAsync(fileUri, csv);
             await Sharing.shareAsync(fileUri);
@@ -70,7 +70,7 @@ export function useExport() {
                                 await backupRepository.importAll(data);
                                 Alert.alert('Success', 'Backup restored successfully!');
                                 if (onSuccess) onSuccess();
-                            } catch (e) {
+                            } catch (e: unknown) {
                                 console.error('Import processing failed:', e);
                                 Alert.alert('Import Failed', 'Invalid backup file format.');
                             } finally {

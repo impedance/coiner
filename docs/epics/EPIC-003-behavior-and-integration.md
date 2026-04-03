@@ -82,15 +82,15 @@ CREATE TABLE money_steps (
 ### 2. Premium UI & Visuals
 - [x] **Artifacts**: Local storage for goal-related images. Show "emotional anchor" on Goal screen.
 - [x] **Reports**: Simple HSL-themed charts (Spending by category, Reserve trend) in `app/report/index.tsx`.
-- [ ] **Money Steps**: Progress tracker for lifestyle upgrades in `app/more/money-steps.tsx`.
-- [ ] **Artifact Creation Flow**: Integration for `expo-image-picker` to save photos to artifacts.
+- [x] **Money Steps**: Progress tracker for lifestyle upgrades in `app/more/money-steps.tsx`.
+- [x] **Artifact Creation Flow**: Integration for `expo-image-picker` to save photos to artifacts.
 
 ### 3. Settings & Portability
-- [ ] **AppData Enrichment**: UI for Currency selection and Week start preference.
-- [ ] **Data Management**: JSON Export/Import and CSV Export (hook `useExport` already implements the logic).
+- [x] **AppData Enrichment**: UI for Currency selection and Week start preference.
+- [x] **Data Management**: JSON Export/Import and CSV Export (hook `useExport` already implements the logic).
 
 ## Definition of Done
 - [x] Cycles correctly handle streaks (Soft vs Classic mode).
-- [ ] Images for artifacts are correctly stored and retrieved from the phone's gallery.
-- [ ] JSON Export/Import works correctly (Full state recovery).
-- [ ] Money steps are visible and manageable within the app.
+- [x] Images for artifacts are correctly stored and retrieved from the phone's gallery.
+- [x] JSON Export/Import works correctly (Full state recovery).
+- [x] Money steps are visible and manageable within the app.

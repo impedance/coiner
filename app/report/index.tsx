@@ -14,7 +14,7 @@ export default function ReportsScreen() {
         );
     }
 
-    const totalSpending = spendingByCategory.reduce((sum, c) => sum + c.amount_cents, 0);
+    const totalSpending = spendingByCategory.reduce((sum: number, c: any) => sum + c.amount_cents, 0);
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>

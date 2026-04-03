@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { cycleRepository } from '../db/repositories/CycleRepository';
 import { practiceRepository } from '../db/repositories/PracticeRepository';
 import { Cycle, PracticeDefinition, PracticeCheckin } from '../types';
@@ -7,6 +7,7 @@ export function useBehavior() {
     const [activeCycle, setActiveCycle] = useState<Cycle | null>(null);
     const [definitions, setDefinitions] = useState<PracticeDefinition[]>([]);
     const [checkins, setCheckins] = useState<PracticeCheckin[]>([]);
+    const [allCycleCheckins, setAllCycleCheckins] = useState<PracticeCheckin[]>([]);
     const [loading, setLoading] = useState(true);
 
     const refresh = useCallback(async () => {
@@ -25,16 +26,65 @@ export function useBehavior() {
                 defs.map(d => practiceRepository.getCheckin(d.id, today, cycle.id))
             );
             setCheckins(dayCheckins.filter((c): c is PracticeCheckin => c !== null));
+
+            // Get all checkins for this cycle for streak calculation
+            const cycleCheckins = await practiceRepository.getCheckinsForPeriod(
+                cycle.start_date.split('T')[0],
+                today,
+                cycle.id
+            );
+            setAllCycleCheckins(cycleCheckins);
         } else {
             setCheckins([]);
+            setAllCycleCheckins([]);
         }
-        
+
         setLoading(false);
     }, []);
 
     useEffect(() => {
         refresh();
     }, [refresh]);
+
+    // Calculate current streak based on consecutive days with all practices completed
+    const streak = useMemo(() => {
+        if (!activeCycle || allCycleCheckins.length === 0) return 0;
+
+        const today = new Date().toISOString().split('T')[0];
+        const checkinsByDate = new Map<string, PracticeCheckin[]>();
+
+        // Group checkins by date
+        for (const checkin of allCycleCheckins) {
+            const existing = checkinsByDate.get(checkin.checkin_date) || [];
+            existing.push(checkin);
+            checkinsByDate.set(checkin.checkin_date, existing);
+        }
+
+        // Count consecutive days from today backwards
+        let currentStreak = 0;
+        const currentDate = new Date();
+
+        while (true) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const dayCheckins = checkinsByDate.get(dateStr) || [];
+
+            // Check if all practices for this day are done
+            const allDone = dayCheckins.length > 0 && dayCheckins.every(c => c.status === 'done');
+
+            if (allDone) {
+                currentStreak++;
+                currentDate.setDate(currentDate.getDate() - 1);
+            } else if (dateStr === today && dayCheckins.length === 0) {
+                // Today has no checkins yet, skip to yesterday
+                currentDate.setDate(currentDate.getDate() - 1);
+                continue;
+            } else {
+                break;
+            }
+        }
+
+        return currentStreak;
+    }, [activeCycle, allCycleCheckins]);
 
     const startCycle = async (title: string, days: number, practiceIds: string[]) => {
         const now = new Date();
@@ -50,7 +100,7 @@ export function useBehavior() {
             status: 'active',
             target_level: 'minimum',
         }, practiceIds);
-        
+
         await refresh();
     };
 
@@ -65,13 +115,21 @@ export function useBehavior() {
         await refresh();
     };
 
+    const completeCycle = async (status: 'completed' | 'failed') => {
+        if (!activeCycle) return;
+        await cycleRepository.updateStatus(activeCycle.id, status);
+        await refresh();
+    };
+
     return {
         activeCycle,
         definitions,
         checkins,
+        streak,
         loading,
         startCycle,
         toggleCheckin,
+        completeCycle,
         refresh,
     };
 }

@@ -8,7 +8,7 @@ import { Image } from 'react-native';
 
 export default function GoalsScreen() {
     const { goals, loading: goalsLoading, createGoal, contribute } = useGoals();
-    const { artifacts, addArtifact, loading: artifactsLoading } = useArtifacts();
+    const { artifacts, addArtifactWithImage, loading: artifactsLoading } = useArtifacts();
     const [modalVisible, setModalVisible] = useState(false);
     const [modalType, setModalType] = useState<'create' | 'contribute' | 'artifact'>('create');
     const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
@@ -18,6 +18,7 @@ export default function GoalsScreen() {
     const [target, setTarget] = useState('');
     const [amount, setAmount] = useState('');
     const [artifactTitle, setArtifactTitle] = useState('');
+    const [artifactDesc, setArtifactDesc] = useState('');
 
     if (goalsLoading || artifactsLoading) {
         return (
@@ -47,13 +48,13 @@ export default function GoalsScreen() {
 
     const handleAddArtifact = async () => {
         if (!selectedGoal || !artifactTitle) return;
-        await addArtifact({
-            goal_id: selectedGoal.id,
-            title: artifactTitle,
-            unlock_rule_type: 'manual',
-        });
-        setModalVisible(false);
-        resetForm();
+        try {
+            await addArtifactWithImage(artifactTitle, artifactDesc);
+            setModalVisible(false);
+            resetForm();
+        } catch (error) {
+            alert('Failed to add artifact. Please check permissions.');
+        }
     };
 
     const resetForm = () => {
@@ -61,6 +62,7 @@ export default function GoalsScreen() {
         setTarget('');
         setAmount('');
         setArtifactTitle('');
+        setArtifactDesc('');
         setSelectedGoal(null);
     };
 
@@ -115,7 +117,11 @@ export default function GoalsScreen() {
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.artifactsList}>
                                         {artifacts.filter(a => a.goal_id === goal.id).map(artifact => (
                                             <View key={artifact.id} style={styles.artifactBadge}>
-                                                <Ionicons name="image-outline" size={16} color="#8E8E93" />
+                                                {artifact.image_uri ? (
+                                                    <Image source={{ uri: artifact.image_uri }} style={styles.artifactImage} />
+                                                ) : (
+                                                    <Ionicons name="image-outline" size={16} color="#8E8E93" />
+                                                )}
                                                 <Text style={styles.artifactBadgeText}>{artifact.title}</Text>
                                             </View>
                                         ))}
@@ -185,13 +191,23 @@ export default function GoalsScreen() {
                         )}
 
                         {modalType === 'artifact' && (
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Anchor Title (e.g. Dream House Photo)"
-                                value={artifactTitle}
-                                onChangeText={setArtifactTitle}
-                                autoFocus
-                            />
+                            <>
+                                <Text style={styles.modalSub}>Add a photo that represents your goal</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Anchor Title (e.g. Dream House Photo)"
+                                    value={artifactTitle}
+                                    onChangeText={setArtifactTitle}
+                                    autoFocus
+                                />
+                                <TextInput
+                                    style={[styles.input, { height: 80 }]}
+                                    placeholder="Why does this matter? (optional)"
+                                    multiline
+                                    value={artifactDesc}
+                                    onChangeText={setArtifactDesc}
+                                />
+                            </>
                         )}
 
                         <View style={styles.modalButtons}>
@@ -252,5 +268,7 @@ const styles = StyleSheet.create({
     artifactsList: { flexDirection: 'row' },
     artifactBadge: { backgroundColor: '#F2F2F7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
     artifactBadgeText: { fontSize: 12, color: '#3A3A3C' },
+    artifactImage: { width: 24, height: 24, borderRadius: 4 },
     emptyArtifacts: { fontSize: 12, color: '#C7C7CC', fontStyle: 'italic' },
+    modalSub: { fontSize: 14, color: '#8E8E93', marginBottom: 12 },
 });

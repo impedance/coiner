@@ -56,6 +56,13 @@ export default function TodayScreen() {
                 >
                     <Text style={styles.actionButtonText}>Add Income</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#007AFF' }]}
+                    onPress={() => router.push('/transaction/new?type=transfer')}
+                >
+                    <Text style={styles.actionButtonText}>Transfer</Text>
+                </TouchableOpacity>
             </View>
 
             <View style={styles.section}>

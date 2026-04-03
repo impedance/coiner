@@ -3,11 +3,13 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert,
 import { useDataSelection } from '../../src/hooks/useData';
 import { accountRepository } from '../../src/db/repositories/AccountRepository';
 import { useExport } from '../../src/hooks/useExport';
+import { useSettings } from '../../src/hooks/useSettings';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function SettingsScreen() {
     const { accounts, isReady, refresh } = useDataSelection();
     const { exportJSON, exportCSV, importJSON, loading: exportLoading } = useExport();
+    const { getSetting, updateSetting } = useSettings();
     const [name, setName] = useState('');
     const [balance, setBalance] = useState('');
 
@@ -31,6 +33,31 @@ export default function SettingsScreen() {
         } catch (error) {
             Alert.alert('Error', 'Failed to create account.');
         }
+    };
+
+    const handleSelectCurrency = () => {
+        Alert.alert(
+            'Primary Currency',
+            'Choose your primary currency for reports/calculations.',
+            [
+                { text: 'EUR (€)', onPress: () => updateSetting('primary_currency', 'EUR') },
+                { text: 'USD ($)', onPress: () => updateSetting('primary_currency', 'USD') },
+                { text: 'RUB (₽)', onPress: () => updateSetting('primary_currency', 'RUB') },
+                { text: 'Cancel', style: 'cancel' }
+            ]
+        );
+    };
+
+    const handleSelectWeekStart = () => {
+        Alert.alert(
+            'Week Start',
+            'When does your financial week begin?',
+            [
+                { text: 'Monday', onPress: () => updateSetting('week_starts_on', 'Monday') },
+                { text: 'Sunday', onPress: () => updateSetting('week_starts_on', 'Sunday') },
+                { text: 'Cancel', style: 'cancel' }
+            ]
+        );
     };
 
     if (!isReady) return null;
@@ -73,17 +100,17 @@ export default function SettingsScreen() {
             {/* App Preferences Section */}
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Preferences</Text>
-                <TouchableOpacity style={styles.item} onPress={() => Alert.alert('Currency', 'Currently only EUR is supported in MVP.')}>
+                <TouchableOpacity style={styles.item} onPress={handleSelectCurrency}>
                     <Text style={styles.itemName}>Primary Currency</Text>
                     <View style={styles.itemRight}>
-                        <Text style={styles.itemValue}>EUR (€)</Text>
+                        <Text style={styles.itemValue}>{getSetting('primary_currency', 'EUR')}</Text>
                         <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
                     </View>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.item} onPress={() => Alert.alert('Week Start', 'Currently fixed to Monday.')}>
+                <TouchableOpacity style={styles.item} onPress={handleSelectWeekStart}>
                     <Text style={styles.itemName}>Week Starts On</Text>
                     <View style={styles.itemRight}>
-                        <Text style={styles.itemValue}>Monday</Text>
+                        <Text style={styles.itemValue}>{getSetting('week_starts_on', 'Monday')}</Text>
                         <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
                     </View>
                 </TouchableOpacity>
