@@ -183,7 +183,14 @@ const MIGRATIONS = [
     updated_at TEXT NOT NULL
   );
   `,
+  // Version 5: Transaction Linking
+  `
+  ALTER TABLE transactions ADD COLUMN goal_id TEXT;
+  ALTER TABLE transactions ADD COLUMN money_step_id TEXT;
+  `,
 ];
+
+
 
 export async function migrate() {
   const db = await getDatabase();

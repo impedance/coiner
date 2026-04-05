@@ -38,12 +38,23 @@ export function useGoals() {
         await refresh();
     };
 
+    const getContributions = async (goalId: string) => {
+        return await goalRepository.getContributions(goalId);
+    };
+
+    const archiveGoal = async (id: string) => {
+        await goalRepository.update(id, { status: 'archived' });
+        await refresh();
+    };
+
     return {
         goals,
         loading,
         createGoal,
         updateGoal,
         contribute,
+        getContributions,
+        archiveGoal,
         refresh
     };
 }

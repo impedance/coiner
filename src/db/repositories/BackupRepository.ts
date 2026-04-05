@@ -55,6 +55,17 @@ export class BackupRepository {
         });
     }
 
+    async clearAllData(): Promise<void> {
+        const db = await getDatabase();
+        await db.withTransactionAsync(async () => {
+            await db.execAsync('PRAGMA foreign_keys = OFF');
+            for (const table of this.tables) {
+                await db.runAsync(`DELETE FROM ${table}`);
+            }
+            await db.execAsync('PRAGMA foreign_keys = ON');
+        });
+    }
+
     async exportTransactionsCSV(): Promise<string> {
         const db = await getDatabase();
         const transactions = await db.getAllAsync<any>(`

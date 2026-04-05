@@ -31,6 +31,8 @@ export interface Transaction {
     amount_cents: number;
     happened_at: string;
     note?: string;
+    goal_id?: string;
+    money_step_id?: string;
     created_at: string;
     updated_at: string;
 }
@@ -130,7 +132,7 @@ export interface PracticeCheckin {
     cycle_id?: string;
     practice_definition_id: string;
     checkin_date: string; // 'YYYY-MM-DD'
-    status: 'done' | 'missed';
+    status: 'missed' | 'minimum' | 'optimum' | 'maximum';
     note?: string;
     created_at: string;
 }

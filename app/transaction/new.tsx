@@ -8,7 +8,7 @@ type TransactionType = 'expense' | 'income' | 'transfer';
 
 export default function NewTransactionScreen() {
     const { type: initialType } = useLocalSearchParams<{ type: TransactionType }>();
-    const { accounts, categories, isReady, refresh } = useDataSelection();
+    const { accounts, categories, goals, moneySteps, isReady, refresh } = useDataSelection();
 
     const [type, setType] = useState<TransactionType>(initialType || 'expense');
     const [step, setStep] = useState(1);
@@ -17,6 +17,8 @@ export default function NewTransactionScreen() {
     const [toAccountId, setToAccountId] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [note, setNote] = useState('');
+    const [goalId, setGoalId] = useState<string | null>(null);
+    const [moneyStepId, setMoneyStepId] = useState<string | null>(null);
 
     const filteredCategories = categories.filter(c => c.kind === type || (type === 'transfer' && c.kind === 'expense'));
 
@@ -44,10 +46,24 @@ export default function NewTransactionScreen() {
                 to_account_id: type === 'transfer' ? toAccountId : undefined,
                 category_id: type !== 'transfer' ? categoryId : undefined,
                 note,
+                goal_id: goalId || undefined,
+                money_step_id: moneyStepId || undefined,
                 happened_at: new Date().toISOString(),
             });
             await refresh();
-            router.back();
+            
+            if (type === 'income') {
+                Alert.alert(
+                    'Income Recorded',
+                    'Would you like to assign this money to your buckets now?',
+                    [
+                        { text: 'Later', onPress: () => router.back() },
+                        { text: 'Assign Now', onPress: () => router.replace('/plan') }
+                    ]
+                );
+            } else {
+                router.back();
+            }
         } catch (error) {
             Alert.alert('Error', 'Failed to save transaction.');
         }
@@ -163,7 +179,7 @@ export default function NewTransactionScreen() {
                 </View>
             )}
 
-            {/* Category Selection (for expense/income) */}
+            {/* Category Selection (for expense/income) + Optional Links */}
             {step === 4 && type !== 'transfer' && (
                 <View style={styles.step}>
                     <Text style={styles.label}>Which category?</Text>
@@ -181,7 +197,59 @@ export default function NewTransactionScreen() {
                         ))}
                     </View>
 
-                    <Text style={[styles.label, { marginTop: 20 }]}>Optional Note</Text>
+                    {/* Optional Goal Linking */}
+                    {goals.length > 0 && (
+                        <>
+                            <Text style={[styles.label, { marginTop: 24, fontSize: 16 }]}>Link to Goal (Optional)</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -24, paddingHorizontal: 24 }}>
+                                <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 8 }}>
+                                    <TouchableOpacity 
+                                        style={[styles.smallOption, !goalId && styles.smallOptionSelected]}
+                                        onPress={() => setGoalId(null)}
+                                    >
+                                        <Text style={[styles.smallOptionText, !goalId && styles.smallOptionTextSelected]}>None</Text>
+                                    </TouchableOpacity>
+                                    {goals.map(g => (
+                                        <TouchableOpacity 
+                                            key={g.id}
+                                            style={[styles.smallOption, goalId === g.id && styles.smallOptionSelected]}
+                                            onPress={() => setGoalId(g.id)}
+                                        >
+                                            <Text style={[styles.smallOptionText, goalId === g.id && styles.smallOptionTextSelected]}>{g.name}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </ScrollView>
+                        </>
+                    )}
+
+                    {/* Optional Money Step Linking */}
+                    {moneySteps.length > 0 && (
+                        <>
+                            <Text style={[styles.label, { marginTop: 16, fontSize: 16 }]}>Link to Money Step (Optional)</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -24, paddingHorizontal: 24 }}>
+                                <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 8 }}>
+                                    <TouchableOpacity 
+                                        style={[styles.smallOption, !moneyStepId && styles.smallOptionSelected]}
+                                        onPress={() => setMoneyStepId(null)}
+                                    >
+                                        <Text style={[styles.smallOptionText, !moneyStepId && styles.smallOptionTextSelected]}>None</Text>
+                                    </TouchableOpacity>
+                                    {moneySteps.map(s => (
+                                        <TouchableOpacity 
+                                            key={s.id}
+                                            style={[styles.smallOption, moneyStepId === s.id && styles.smallOptionSelected]}
+                                            onPress={() => setMoneyStepId(s.id)}
+                                        >
+                                            <Text style={[styles.smallOptionText, moneyStepId === s.id && styles.smallOptionTextSelected]}>{s.title}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </ScrollView>
+                        </>
+                    )}
+
+                    <Text style={[styles.label, { marginTop: 24 }]}>Optional Note</Text>
                     <TextInput
                         style={styles.input}
                         placeholder={type === 'expense' ? "Coffee, rent, groceries..." : "Salary, gift, refund..."}
@@ -197,6 +265,7 @@ export default function NewTransactionScreen() {
                     </TouchableOpacity>
                 </View>
             )}
+
 
             {/* Transfer Summary Step */}
             {step === 5 && type === 'transfer' && (
@@ -309,6 +378,26 @@ const styles = StyleSheet.create({
     optionTextSelected: {
         color: '#FFFFFF',
         fontWeight: '600',
+    },
+    smallOption: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        backgroundColor: '#F2F2F7',
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    smallOptionSelected: {
+        backgroundColor: '#E5E5EA',
+        borderColor: '#007AFF',
+    },
+    smallOptionText: {
+        fontSize: 14,
+        color: '#000',
+    },
+    smallOptionTextSelected: {
+        color: '#007AFF',
+        fontWeight: '700',
     },
     nextButton: {
         backgroundColor: '#007AFF',

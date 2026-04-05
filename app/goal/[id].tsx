@@ -1,25 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, Text, View, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, TextInput, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useGoals } from '../../src/hooks/useGoals';
 import { useArtifacts } from '../../src/hooks/useArtifacts';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { GoalContribution } from '../../src/types';
 
 export default function GoalDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { goals, contribute, loading: goalsLoading } = useGoals();
+    const { goals, contribute, archiveGoal, getContributions, loading: goalsLoading } = useGoals();
     const { artifacts, loading: artifactsLoading, addArtifact } = useArtifacts(id);
     const router = useRouter();
 
     const [modalVisible, setModalVisible] = useState(false);
+    const [contribModalVisible, setContribModalVisible] = useState(false);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [imageUri, setImageUri] = useState<string | null>(null);
+    const [contribAmount, setContribAmount] = useState('');
+    const [contribNote, setContribNote] = useState('');
     const [saving, setSaving] = useState(false);
+    const [contributions, setContributions] = useState<GoalContribution[]>([]);
 
     const goal = goals.find(g => g.id === id);
     const goalArtifacts = artifacts;
+
+    const loadContributions = useCallback(async () => {
+        if (!id) return;
+        const data = await getContributions(id);
+        setContributions(data);
+    }, [id, getContributions]);
+
+    useEffect(() => {
+        loadContributions();
+    }, [loadContributions]);
 
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -65,6 +80,47 @@ export default function GoalDetailScreen() {
         }
     };
 
+    const handleContribute = async () => {
+        if (!contribAmount || isNaN(parseFloat(contribAmount))) {
+            Alert.alert('Invalid Amount', 'Please enter a valid amount.');
+            return;
+        }
+        if (!id) return;
+
+        setSaving(true);
+        try {
+            await contribute(id, Math.round(parseFloat(contribAmount) * 100), contribNote);
+            await loadContributions();
+            setContribModalVisible(false);
+            setContribAmount('');
+            setContribNote('');
+        } catch (error) {
+            Alert.alert('Error', 'Failed to record contribution.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleArchive = () => {
+        Alert.alert(
+            'Archive Goal',
+            'This goal will be hidden but your data is safe. You can restart or review it later.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Archive', 
+                    style: 'destructive',
+                    onPress: async () => {
+                        if (id) {
+                            await archiveGoal(id);
+                            router.back();
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     if (goalsLoading || artifactsLoading) {
         return (
             <View style={styles.centered}>
@@ -90,9 +146,12 @@ export default function GoalDetailScreen() {
                     <Ionicons name="chevron-back" size={28} color="#007AFF" />
                 </TouchableOpacity>
                 <Text style={styles.title} numberOfLines={1}>{goal.name}</Text>
+                <TouchableOpacity onPress={handleArchive}>
+                    <Ionicons name="archive-outline" size={24} color="#8E8E93" />
+                </TouchableOpacity>
             </View>
 
-            {/* Main Visual Anchor (First Artifact with Image) */}
+            {/* Main Visual Anchor */}
             {goalArtifacts.length > 0 && goalArtifacts[0].image_uri ? (
                 <View style={styles.anchorContainer}>
                     <Image source={{ uri: goalArtifacts[0].image_uri }} style={styles.anchorImage} />
@@ -111,12 +170,12 @@ export default function GoalDetailScreen() {
             {/* Progress Card */}
             <View style={styles.card}>
                 <View style={styles.row}>
-                    <View>
+                    <View style={styles.statContainer}>
                         <Text style={styles.statLabel}>Current</Text>
                         <Text style={styles.statValue}>{(goal.current_cents / 100).toFixed(0)}€</Text>
                     </View>
                     <View style={styles.statDivider} />
-                    <View>
+                    <View style={styles.statContainer}>
                         <Text style={styles.statLabel}>Target</Text>
                         <Text style={styles.statValue}>{(goal.target_cents / 100).toFixed(0)}€</Text>
                     </View>
@@ -125,12 +184,19 @@ export default function GoalDetailScreen() {
                 <View style={styles.progressBarContainer}>
                     <View style={[styles.progressBar, { width: `${Math.min(1, progress) * 100}%` }]} />
                 </View>
-                <Text style={styles.progressPercentage}>{(progress * 100).toFixed(1)}% complete</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                    <Text style={styles.progressPercentage}>{(progress * 100).toFixed(1)}%</Text>
+                    <TouchableOpacity onPress={() => setContribModalVisible(true)}>
+                        <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>+ Contribute</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Anchors Section */}
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Emotional Anchors</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <Text style={styles.sectionTitle}>Emotional Anchors</Text>
+                </View>
                 {goalArtifacts.map(artifact => (
                     <View key={artifact.id} style={styles.artifactItem}>
                         <View style={styles.artifactIcon}>
@@ -138,7 +204,7 @@ export default function GoalDetailScreen() {
                         </View>
                         <View style={styles.artifactText}>
                             <Text style={styles.artifactTitleText}>{artifact.title}</Text>
-                            <Text style={styles.artifactNote} numberOfLines={2}>{artifact.description || 'No description'}</Text>
+                            <Text style={styles.artifactNote} numberOfLines={2}>{artifact.description || 'Reason to win'}</Text>
                         </View>
                     </View>
                 ))}
@@ -155,9 +221,25 @@ export default function GoalDetailScreen() {
             {/* Recent Contributions */}
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Recent Contributions</Text>
-                <Text style={styles.placeholderText}>Contributions will appear here.</Text>
+                {contributions.length === 0 ? (
+                    <Text style={styles.placeholderText}>No contributions yet. Start saving!</Text>
+                ) : (
+                    contributions.map(contrib => (
+                        <View key={contrib.id} style={styles.contributionItem}>
+                            <View style={styles.contributionIcon}>
+                                <Ionicons name="trending-up" size={20} color="#34C759" />
+                            </View>
+                            <View style={styles.contributionText}>
+                                <Text style={styles.contributionAmount}>+{(contrib.amount_cents / 100).toFixed(2)}€</Text>
+                                <Text style={styles.contributionDate}>{new Date(contrib.happened_at).toLocaleDateString()}</Text>
+                            </View>
+                            {contrib.note && <Text style={styles.contributionNote}>{contrib.note}</Text>}
+                        </View>
+                    ))
+                )}
             </View>
 
+            {/* New Anchor Modal */}
             <Modal visible={modalVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
@@ -199,11 +281,45 @@ export default function GoalDetailScreen() {
                             onPress={handleSaveArtifact}
                             disabled={saving}
                         >
-                            {saving ? (
-                                <ActivityIndicator color="#FFFFFF" />
-                            ) : (
-                                <Text style={styles.saveButtonText}>Save Anchor</Text>
-                            )}
+                            {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>Save Anchor</Text>}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Contribution Modal */}
+            <Modal visible={contribModalVisible} animationType="slide" transparent>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Record Contribution</Text>
+                            <TouchableOpacity onPress={() => setContribModalVisible(false)}>
+                                <Ionicons name="close" size={24} color="#8E8E93" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Amount (e.g. 50.00)"
+                            keyboardType="decimal-pad"
+                            value={contribAmount}
+                            onChangeText={setContribAmount}
+                            autoFocus
+                        />
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Optional Note"
+                            value={contribNote}
+                            onChangeText={setContribNote}
+                        />
+
+                        <TouchableOpacity 
+                            style={[styles.saveButton, { backgroundColor: '#34C759' }, saving && styles.disabledButton]} 
+                            onPress={handleContribute}
+                            disabled={saving}
+                        >
+                            {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>Record Progress</Text>}
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -228,13 +344,13 @@ const styles = StyleSheet.create({
     anchorSub: { color: '#E5E5EA', fontSize: 13, textTransform: 'uppercase', fontWeight: '600' },
     card: { backgroundColor: '#FFFFFF', margin: 20, borderRadius: 20, padding: 20, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 10 },
     row: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
-    statItem: { alignItems: 'center' },
+    statContainer: { alignItems: 'center', flex: 1 },
     statLabel: { fontSize: 12, color: '#8E8E93', textTransform: 'uppercase', marginBottom: 4 },
     statValue: { fontSize: 24, fontWeight: '700', color: '#1C1C1E' },
     statDivider: { width: 1, height: '100%', backgroundColor: '#F2F2F7' },
     progressBarContainer: { height: 12, backgroundColor: '#F2F2F7', borderRadius: 6, overflow: 'hidden' },
     progressBar: { height: '100%', backgroundColor: '#34C759' },
-    progressPercentage: { textAlign: 'right', fontSize: 13, color: '#8E8E93', marginTop: 8 },
+    progressPercentage: { fontSize: 13, color: '#8E8E93' },
     section: { paddingHorizontal: 20, marginBottom: 24 },
     sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16, color: '#1C1C1E' },
     artifactItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16, marginBottom: 12 },
@@ -244,6 +360,12 @@ const styles = StyleSheet.create({
     artifactNote: { fontSize: 14, color: '#8E8E93', marginTop: 2 },
     addAnchorButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, gap: 8 },
     addAnchorText: { color: '#007AFF', fontWeight: '600', fontSize: 15 },
+    contributionItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16, marginBottom: 10 },
+    contributionIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F2FFF5', justifyContent: 'center', alignItems: 'center' },
+    contributionText: { marginLeft: 12, flex: 1, flexDirection: 'row', justifyContent: 'space-between' },
+    contributionAmount: { fontSize: 17, fontWeight: '700', color: '#34C759' },
+    contributionDate: { fontSize: 13, color: '#8E8E93' },
+    contributionNote: { fontSize: 13, color: '#8E8E93', marginLeft: 48, marginTop: -4, marginBottom: 4 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },

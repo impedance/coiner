@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function SettingsScreen() {
     const { accounts, isReady, refresh } = useDataSelection();
-    const { exportJSON, exportCSV, importJSON, loading: exportLoading } = useExport();
+    const { exportJSON, exportCSV, importJSON, resetData, loading: exportLoading } = useExport();
     const { getSetting, updateSetting } = useSettings();
     const [name, setName] = useState('');
     const [balance, setBalance] = useState('');
@@ -134,6 +134,10 @@ export default function SettingsScreen() {
                         <TouchableOpacity style={styles.actionItem} onPress={exportCSV}>
                             <Ionicons name="list-outline" size={22} color="#34C759" />
                             <Text style={[styles.actionText, { color: '#34C759' }]}>Export Transactions (CSV)</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.actionItem, { borderBottomWidth: 0 }]} onPress={() => resetData(refresh)}>
+                            <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+                            <Text style={[styles.actionText, { color: '#FF3B30' }]}>Reset All Data (Danger)</Text>
                         </TouchableOpacity>
                     </>
                 )}

@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { PracticeDefinition } from '../../src/types';
 
 export default function BehaviorScreen() {
-    const { activeCycle, definitions, checkins, streak, loading, startCycle, toggleCheckin, completeCycle } = useBehavior();
+    const { activeCycle, definitions, checkins, streak, loading, startCycle, setCheckin, completeCycle } = useBehavior();
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedPracticeIds, setSelectedPracticeIds] = useState<string[]>([]);
     const [showCompleteModal, setShowCompleteModal] = useState(false);
@@ -72,23 +72,48 @@ export default function BehaviorScreen() {
 
                     <Text style={styles.sectionTitle}>Today's Practices</Text>
                     {definitions.map(def => {
-                        const isDone = checkins.some(c => c.practice_definition_id === def.id && c.status === 'done');
+                        const checkin = checkins.find(c => c.practice_definition_id === def.id);
+                        const status = checkin?.status || 'missed';
+                        
                         return (
-                            <TouchableOpacity 
-                                key={def.id} 
-                                style={[styles.practiceItem, isDone && styles.practiceItemDone]}
-                                onPress={() => toggleCheckin(def.id, isDone ? 'missed' : 'done')}
-                            >
-                                <Ionicons 
-                                    name={isDone ? "checkmark-circle" : "ellipse-outline"} 
-                                    size={28} 
-                                    color={isDone ? "#34C759" : "#C7C7CC"} 
-                                />
-                                <View style={styles.practiceTextContainer}>
-                                    <Text style={[styles.practiceName, isDone && styles.practiceNameDone]}>{def.title}</Text>
-                                    <Text style={styles.practiceScope}>{def.scope}</Text>
+                            <View key={def.id} style={styles.practiceCard}>
+                                <View style={styles.practiceHeader}>
+                                    <View style={styles.practiceTextContainer}>
+                                        <Text style={styles.practiceName}>{def.title}</Text>
+                                        <Text style={styles.practiceScope}>{def.scope}</Text>
+                                    </View>
                                 </View>
-                            </TouchableOpacity>
+                                
+                                <View style={styles.levelSelector}>
+                                    <TouchableOpacity 
+                                        style={[styles.levelBtn, status === 'missed' && styles.levelBtnMissed]} 
+                                        onPress={() => setCheckin(def.id, 'missed')}
+                                    >
+                                        <Ionicons name="close" size={20} color={status === 'missed' ? '#FFFFFF' : '#8E8E93'} />
+                                    </TouchableOpacity>
+                                    
+                                    <TouchableOpacity 
+                                        style={[styles.levelBtn, status === 'minimum' && styles.levelBtnMin]} 
+                                        onPress={() => setCheckin(def.id, 'minimum')}
+                                    >
+                                        <Text style={[styles.levelBtnText, status === 'minimum' && styles.levelBtnTextActive]}>MIN</Text>
+                                    </TouchableOpacity>
+                                    
+                                    <TouchableOpacity 
+                                        style={[styles.levelBtn, status === 'optimum' && styles.levelBtnOpt]} 
+                                        onPress={() => setCheckin(def.id, 'optimum')}
+                                    >
+                                        <Text style={[styles.levelBtnText, status === 'optimum' && styles.levelBtnTextActive]}>OPT</Text>
+                                    </TouchableOpacity>
+                                    
+                                    <TouchableOpacity 
+                                        style={[styles.levelBtn, status === 'maximum' && styles.levelBtnMax]} 
+                                        onPress={() => setCheckin(def.id, 'maximum')}
+                                    >
+                                        <Text style={[styles.levelBtnText, status === 'maximum' && styles.levelBtnTextActive]}>MAX</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
                         );
                     })}
 
@@ -96,7 +121,7 @@ export default function BehaviorScreen() {
                         style={styles.completeCycleButton}
                         onPress={() => setShowCompleteModal(true)}
                     >
-                        <Text style={styles.completeCycleButtonText}>Complete Cycle</Text>
+                        <Text style={styles.completeCycleButtonText}>Finish Cycle</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
@@ -215,45 +240,53 @@ const styles = StyleSheet.create({
     content: { padding: 20, paddingTop: 60 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     title: { fontSize: 34, fontWeight: 'bold', marginBottom: 24 },
-    cycleCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, elevation: 5, boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.1)' },
+    cycleCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
     cycleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-    cycleTitle: { fontSize: 22, fontWeight: '700' },
-    cycleSub: { color: '#8E8E93', fontSize: 14, marginTop: 2 },
-    streakContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF9F2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-    streakText: { marginLeft: 4, fontSize: 18, fontWeight: '700', color: '#FF9500' },
-    progressContainer: { height: 10, backgroundColor: '#E5E5EA', borderRadius: 5, marginBottom: 24, overflow: 'hidden' },
+    cycleTitle: { fontSize: 22, fontWeight: '800', color: '#1C1C1E' },
+    cycleSub: { color: '#8E8E93', fontSize: 14, marginTop: 4, fontWeight: '500' },
+    streakContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF9F2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14 },
+    streakText: { marginLeft: 6, fontSize: 18, fontWeight: '800', color: '#FF9500' },
+    progressContainer: { height: 8, backgroundColor: '#E5E5EA', borderRadius: 4, marginBottom: 28, overflow: 'hidden' },
     progressBar: { height: '100%', backgroundColor: '#007AFF' },
-    sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 16 },
-    practiceItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9F9F9', padding: 16, borderRadius: 16, marginBottom: 12 },
-    practiceItemDone: { backgroundColor: '#F2FFF5' },
-    practiceTextContainer: { marginLeft: 12 },
-    practiceName: { fontSize: 16, fontWeight: '600' },
-    practiceNameDone: { color: '#8E8E93', textDecorationLine: 'line-through' },
-    practiceScope: { fontSize: 12, color: '#8E8E93', textTransform: 'capitalize' },
+    sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16, color: '#1C1C1E' },
+    practiceCard: { backgroundColor: '#F9F9F9', borderRadius: 20, padding: 16, marginBottom: 16 },
+    practiceHeader: { marginBottom: 12 },
+    practiceTextContainer: { flex: 1 },
+    practiceName: { fontSize: 17, fontWeight: '700', color: '#1C1C1E' },
+    practiceScope: { fontSize: 13, color: '#8E8E93', textTransform: 'capitalize', marginTop: 2 },
+    levelSelector: { flexDirection: 'row', gap: 8 },
+    levelBtn: { flex: 1, height: 44, borderRadius: 12, backgroundColor: '#E5E5EA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'transparent' },
+    levelBtnMissed: { backgroundColor: '#FF3B30' },
+    levelBtnMin: { backgroundColor: '#FF9500' },
+    levelBtnOpt: { backgroundColor: '#007AFF' },
+    levelBtnMax: { backgroundColor: '#34C759' },
+    levelBtnText: { fontSize: 12, fontWeight: '800', color: '#8E8E93' },
+    levelBtnTextActive: { color: '#FFFFFF' },
     emptyState: { alignItems: 'center', marginTop: 60, padding: 20 },
-    emptyTitle: { fontSize: 24, fontWeight: '700', marginTop: 20, marginBottom: 12 },
-    emptyText: { textAlign: 'center', color: '#8E8E93', fontSize: 16, lineHeight: 22, marginBottom: 32 },
-    startButton: { backgroundColor: '#007AFF', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16 },
-    startButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%' },
-    modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 20 },
-    selectionItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
-    selectionText: { marginLeft: 12, fontSize: 16 },
-    modalButtons: { flexDirection: 'row', gap: 12, marginTop: 24 },
-    cancelButton: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center', backgroundColor: '#F2F2F7' },
-    cancelButtonText: { color: '#8E8E93', fontSize: 16, fontWeight: '600' },
-    confirmButton: { flex: 2, padding: 16, borderRadius: 12, alignItems: 'center', backgroundColor: '#007AFF' },
-    confirmButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+    emptyTitle: { fontSize: 26, fontWeight: '800', marginTop: 24, marginBottom: 12, color: '#1C1C1E' },
+    emptyText: { textAlign: 'center', color: '#8E8E93', fontSize: 17, lineHeight: 24, marginBottom: 36 },
+    startButton: { backgroundColor: '#007AFF', paddingHorizontal: 40, paddingVertical: 18, borderRadius: 18, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+    startButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+    modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: '85%' },
+    modalTitle: { fontSize: 24, fontWeight: '800', marginBottom: 20, color: '#1C1C1E' },
+    selectionItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
+    selectionText: { marginLeft: 16, fontSize: 17, fontWeight: '500' },
+    modalButtons: { flexDirection: 'row', gap: 14, marginTop: 32 },
+    cancelButton: { flex: 1, padding: 18, borderRadius: 16, alignItems: 'center', backgroundColor: '#F2F2F7' },
+    cancelButtonText: { color: '#8E8E93', fontSize: 17, fontWeight: '700' },
+    confirmButton: { flex: 2, padding: 18, borderRadius: 16, alignItems: 'center', backgroundColor: '#007AFF' },
+    confirmButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
     disabledButton: { opacity: 0.5 },
-    moneyStepsLink: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginTop: 24, marginBottom: 40, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 4 },
-    moneyStepsIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' },
+    moneyStepsLink: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginTop: 12, marginBottom: 40, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+    moneyStepsIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' },
     moneyStepsText: { flex: 1, marginLeft: 16 },
-    moneyStepsTitle: { fontSize: 17, fontWeight: '700', color: '#1C1C1E' },
-    moneyStepsSub: { fontSize: 14, color: '#8E8E93', marginTop: 2 },
-    completeCycleButton: { marginTop: 20, padding: 16, borderRadius: 12, backgroundColor: '#F2F2F7', alignItems: 'center' },
-    completeCycleButtonText: { color: '#007AFF', fontSize: 16, fontWeight: '600' },
-    modalSub: { fontSize: 14, color: '#8E8E93', marginBottom: 20 },
-    completeOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 12, gap: 8 },
-    completeOptionText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+    moneyStepsTitle: { fontSize: 18, fontWeight: '800', color: '#1C1C1E' },
+    moneyStepsSub: { fontSize: 14, color: '#8E8E93', marginTop: 3 },
+    completeCycleButton: { marginTop: 24, padding: 18, borderRadius: 16, backgroundColor: '#F2F2F7', alignItems: 'center' },
+    completeCycleButtonText: { color: '#007AFF', fontSize: 17, fontWeight: '700' },
+    modalSub: { fontSize: 16, color: '#8E8E93', marginBottom: 24, lineHeight: 22 },
+    completeOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 20, borderRadius: 16, gap: 12 },
+    completeOptionText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
 });
+

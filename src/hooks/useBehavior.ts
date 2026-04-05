@@ -68,8 +68,8 @@ export function useBehavior() {
             const dateStr = currentDate.toISOString().split('T')[0];
             const dayCheckins = checkinsByDate.get(dateStr) || [];
 
-            // Check if all practices for this day are done
-            const allDone = dayCheckins.length > 0 && dayCheckins.every(c => c.status === 'done');
+            // Check if all practices for this day are done (min level achieved)
+            const allDone = dayCheckins.length > 0 && dayCheckins.every(c => c.status !== 'missed');
 
             if (allDone) {
                 currentStreak++;
@@ -104,7 +104,7 @@ export function useBehavior() {
         await refresh();
     };
 
-    const toggleCheckin = async (definitionId: string, status: 'done' | 'missed') => {
+    const setCheckin = async (definitionId: string, status: 'missed' | 'minimum' | 'optimum' | 'maximum') => {
         const today = new Date().toISOString().split('T')[0];
         await practiceRepository.upsertCheckin({
             practice_definition_id: definitionId,
@@ -128,7 +128,7 @@ export function useBehavior() {
         streak,
         loading,
         startCycle,
-        toggleCheckin,
+        setCheckin,
         completeCycle,
         refresh,
     };

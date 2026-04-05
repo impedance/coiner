@@ -14,9 +14,10 @@ export class TransactionRepository {
         const now = new Date().toISOString();
 
         await db.runAsync(
-            'INSERT INTO transactions (id, type, account_id, to_account_id, category_id, amount_cents, happened_at, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            id, tx.type ?? 'expense', tx.account_id ?? '', tx.to_account_id ?? null, tx.category_id ?? null, tx.amount_cents ?? 0, tx.happened_at || now, tx.note ?? null, now, now
+            'INSERT INTO transactions (id, type, account_id, to_account_id, category_id, amount_cents, happened_at, note, goal_id, money_step_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            id, tx.type ?? 'expense', tx.account_id ?? '', tx.to_account_id ?? null, tx.category_id ?? null, tx.amount_cents ?? 0, tx.happened_at || now, tx.note ?? null, tx.goal_id ?? null, tx.money_step_id ?? null, now, now
         );
+
 
         return id;
     }

@@ -48,7 +48,7 @@ export class PracticeRepository {
         );
     }
 
-    async upsertCheckin(checkin: Partial<PracticeCheckin> & { practice_definition_id: string, checkin_date: string, status: 'done' | 'missed' }): Promise<void> {
+    async upsertCheckin(checkin: Partial<PracticeCheckin> & { practice_definition_id: string, checkin_date: string, status: 'missed' | 'minimum' | 'optimum' | 'maximum' }): Promise<void> {
         const db = await getDatabase();
         const existing = await this.getCheckin(checkin.practice_definition_id, checkin.checkin_date, checkin.cycle_id);
 

@@ -87,10 +87,51 @@ export function useExport() {
         }
     }, []);
 
+    const resetData = useCallback(async (onSuccess?: () => void) => {
+        Alert.alert(
+            'CRITICAL: Reset Data',
+            'This will permanently delete ALL accounts, transactions, goals, and cycles. There is no undo.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Confirm Reset', 
+                    style: 'destructive', 
+                    onPress: () => {
+                        Alert.alert(
+                            'Final Warning',
+                            'Are you absolutely sure you want to delete everything?',
+                            [
+                                { text: 'Cancel', style: 'cancel' },
+                                { 
+                                    text: 'Yes, Delete Everything', 
+                                    style: 'destructive', 
+                                    onPress: async () => {
+                                        setLoading(true);
+                                        try {
+                                            await backupRepository.clearAllData();
+                                            Alert.alert('Success', 'All local data has been cleared.');
+                                            if (onSuccess) onSuccess();
+                                        } catch (e) {
+                                            console.error('Reset failed:', e);
+                                            Alert.alert('Error', 'Failed to reset data.');
+                                        } finally {
+                                            setLoading(false);
+                                        }
+                                    }
+                                }
+                            ]
+                        );
+                    }
+                }
+            ]
+        );
+    }, []);
+
     return {
         exportJSON,
         exportCSV,
         importJSON,
+        resetData,
         loading,
     };
 }
