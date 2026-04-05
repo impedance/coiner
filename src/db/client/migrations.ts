@@ -188,6 +188,19 @@ const MIGRATIONS = [
   ALTER TABLE transactions ADD COLUMN goal_id TEXT;
   ALTER TABLE transactions ADD COLUMN money_step_id TEXT;
   `,
+  // Version 6: Category Groups
+  `
+  CREATE TABLE IF NOT EXISTS category_groups (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_system INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  ALTER TABLE categories ADD COLUMN group_id TEXT;
+  `,
 ];
 
 

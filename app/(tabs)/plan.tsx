@@ -11,7 +11,7 @@ export default function PlanScreen() {
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }, []);
 
-    const { plans, categories, unassignedMoney, loading, assignMoney, updatePlanned } = usePlanning(monthKey);
+    const { plans, categories, categoryGroups, unassignedMoney, loading, assignMoney, updatePlanned } = usePlanning(monthKey);
     const { transactions } = useDataSelection();
 
     const [selectedCategory, setSelectedCategory] = React.useState<Category | null>(null);
@@ -46,6 +46,16 @@ export default function PlanScreen() {
         setEditAmount('');
     };
 
+    const categoriesByGroup = useMemo(() => {
+        const grouped: Record<string, Category[]> = {};
+        categories.forEach(cat => {
+            const groupId = cat.group_id || 'unprocessed';
+            if (!grouped[groupId]) grouped[groupId] = [];
+            grouped[groupId].push(cat);
+        });
+        return grouped;
+    }, [categories]);
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -59,52 +69,93 @@ export default function PlanScreen() {
             </View>
 
             <ScrollView style={styles.bucketList}>
-                {categories.map(cat => {
-                    const plan = plans.find(p => p.category_id === cat.id);
-                    const spent = getSpentForCategory(cat.id);
-                    const assigned = plan?.assigned_cents || 0;
-                    const available = assigned - spent;
+                {categoryGroups.map(group => {
+                    const groupCats = categoriesByGroup[group.id] || [];
+                    if (groupCats.length === 0) return null;
+
+                    const groupPlanned = groupCats.reduce((sum, cat) => {
+                        const plan = plans.find(p => p.category_id === cat.id);
+                        return sum + (plan?.planned_cents || 0);
+                    }, 0);
+
+                    const groupSpent = groupCats.reduce((sum, cat) => sum + getSpentForCategory(cat.id), 0);
+                    const groupAssigned = groupCats.reduce((sum, cat) => {
+                        const plan = plans.find(p => p.category_id === cat.id);
+                        return sum + (plan?.assigned_cents || 0);
+                    }, 0);
+                    const groupAvailable = groupAssigned - groupSpent;
 
                     return (
-                        <View key={cat.id} style={styles.bucketItem}>
-                            <View style={styles.bucketHeader}>
-                                <Text style={styles.bucketName}>{cat.name}</Text>
-                                <View style={styles.bucketActions}>
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            setSelectedCategory(cat);
-                                            setEditType('planned');
-                                            setEditAmount(((plan?.planned_cents || 0) / 100).toString());
-                                        }}
-                                    >
-                                        <Ionicons name="settings-outline" size={20} color="#8E8E93" />
-                                    </TouchableOpacity>
+                        <View key={group.id} style={styles.groupContainer}>
+                            <View style={styles.groupHeader}>
+                                <Text style={styles.groupName}>{group.name}</Text>
+                                <View style={styles.groupTotals}>
+                                    <View style={styles.groupTotalItem}>
+                                        <Text style={styles.groupTotalLabel}>Planned</Text>
+                                        <Text style={styles.groupTotalValue}>{(groupPlanned / 100).toFixed(0)}€</Text>
+                                    </View>
+                                    <View style={[styles.groupTotalItem, { alignItems: 'flex-end' }]}>
+                                        <Text style={styles.groupTotalLabel}>Available</Text>
+                                        <Text style={[styles.groupTotalValue, { color: groupAvailable < 0 ? '#FF3B30' : '#007AFF' }]}>
+                                            {(groupAvailable / 100).toFixed(0)}€
+                                        </Text>
+                                    </View>
                                 </View>
                             </View>
 
-                            <View style={styles.bucketStats}>
-                                <View style={styles.stat}>
-                                    <Text style={styles.statLabel}>Planned</Text>
-                                    <Text style={styles.statValue}>{((plan?.planned_cents || 0) / 100).toFixed(0)}€</Text>
-                                </View>
-                                <View style={styles.stat}>
-                                    <Text style={styles.statLabel}>Spent</Text>
-                                    <Text style={styles.statValue}>{(spent / 100).toFixed(0)}€</Text>
-                                </View>
-                                <TouchableOpacity
-                                    style={[styles.stat, styles.availableStat]}
-                                    onPress={() => {
-                                        setSelectedCategory(cat);
-                                        setEditType('assigned');
-                                        setEditAmount((assigned / 100).toString());
-                                    }}
-                                >
-                                    <Text style={styles.statLabel}>Available</Text>
-                                    <Text style={[styles.statValue, { color: available < 0 ? '#FF3B30' : '#007AFF' }]}>
-                                        {(available / 100).toFixed(0)}€
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
+                            {groupCats.map(cat => {
+                                const plan = plans.find(p => p.category_id === cat.id);
+                                const spent = getSpentForCategory(cat.id);
+                                const assigned = plan?.assigned_cents || 0;
+                                const available = assigned - spent;
+                                const isSystem = cat.is_system;
+
+                                return (
+                                    <View key={cat.id} style={[styles.bucketItem, isSystem && styles.systemBucket]}>
+                                        <View style={styles.bucketHeader}>
+                                            <Text style={[styles.bucketName, isSystem && styles.systemBucketName]}>
+                                                {cat.name}
+                                                {isSystem && <Text style={styles.systemIcon}> 🛡️</Text>}
+                                            </Text>
+                                            <View style={styles.bucketActions}>
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        setSelectedCategory(cat);
+                                                        setEditType('planned');
+                                                        setEditAmount(((plan?.planned_cents || 0) / 100).toString());
+                                                    }}
+                                                >
+                                                    <Ionicons name="settings-outline" size={20} color={isSystem ? "#007AFF" : "#8E8E93"} />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.bucketStats}>
+                                            <View style={styles.stat}>
+                                                <Text style={styles.statLabel}>Planned</Text>
+                                                <Text style={styles.statValue}>{((plan?.planned_cents || 0) / 100).toFixed(0)}€</Text>
+                                            </View>
+                                            <View style={styles.stat}>
+                                                <Text style={styles.statLabel}>Spent</Text>
+                                                <Text style={styles.statValue}>{(spent / 100).toFixed(0)}€</Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                style={[styles.stat, styles.availableStat]}
+                                                onPress={() => {
+                                                    setSelectedCategory(cat);
+                                                    setEditType('assigned');
+                                                    setEditAmount((assigned / 100).toString());
+                                                }}
+                                            >
+                                                <Text style={styles.statLabel}>Available</Text>
+                                                <Text style={[styles.statValue, { color: available < 0 ? '#FF3B30' : '#34C759' }]}>
+                                                    {(available / 100).toFixed(0)}€
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                );
+                            })}
                         </View>
                     );
                 })}
@@ -165,4 +216,14 @@ const styles = StyleSheet.create({
     cancelButtonText: { color: '#FF3B30', fontSize: 16, fontWeight: '600' },
     saveButton: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center', backgroundColor: '#007AFF' },
     saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+    groupContainer: { marginBottom: 24 },
+    groupHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12, paddingHorizontal: 4 },
+    groupName: { fontSize: 20, fontWeight: '700', color: '#1C1C1E' },
+    groupTotals: { flexDirection: 'row', gap: 16 },
+    groupTotalItem: { alignItems: 'flex-start' },
+    groupTotalLabel: { fontSize: 10, color: '#8E8E93', textTransform: 'uppercase', marginBottom: 2 },
+    groupTotalValue: { fontSize: 14, fontWeight: '600', color: '#3A3A3C' },
+    systemBucket: { borderLeftWidth: 4, borderLeftColor: '#007AFF', backgroundColor: '#F0F7FF' },
+    systemBucketName: { color: '#004085' },
+    systemIcon: { fontSize: 14 },
 });

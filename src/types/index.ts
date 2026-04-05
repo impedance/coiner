@@ -9,10 +9,20 @@ export interface Account {
     updated_at: string;
 }
 
+export interface CategoryGroup {
+    id: string;
+    name: string;
+    sort_order: number;
+    is_system: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface Category {
     id: string;
     name: string;
     kind: 'expense' | 'income';
+    group_id?: string;
     bucket_type?: 'reserve' | 'joy' | 'income' | 'expense';
     icon?: string;
     sort_order: number;

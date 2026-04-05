@@ -53,12 +53,13 @@ export default function NewTransactionScreen() {
             await refresh();
             
             if (type === 'income') {
+                const amountCents = Math.round(parseFloat(amount.replace(',', '.')) * 100);
                 Alert.alert(
                     'Income Recorded',
                     'Would you like to assign this money to your buckets now?',
                     [
                         { text: 'Later', onPress: () => router.back() },
-                        { text: 'Assign Now', onPress: () => router.replace('/plan') }
+                        { text: 'Assign Now', onPress: () => router.replace(`/transaction/income-wizard?amountCents=${amountCents}`) }
                     ]
                 );
             } else {

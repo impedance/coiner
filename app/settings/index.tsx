@@ -4,12 +4,16 @@ import { useDataSelection } from '../../src/hooks/useData';
 import { accountRepository } from '../../src/db/repositories/AccountRepository';
 import { useExport } from '../../src/hooks/useExport';
 import { useSettings } from '../../src/hooks/useSettings';
+import { useBehavior } from '../../src/hooks/useBehavior';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 export default function SettingsScreen() {
     const { accounts, isReady, refresh } = useDataSelection();
     const { exportJSON, exportCSV, importJSON, resetData, loading: exportLoading } = useExport();
     const { getSetting, updateSetting } = useSettings();
+    const { definitions } = useBehavior();
+    const router = useRouter();
     const [name, setName] = useState('');
     const [balance, setBalance] = useState('');
 
@@ -107,10 +111,10 @@ export default function SettingsScreen() {
                         <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
                     </View>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.item} onPress={handleSelectWeekStart}>
-                    <Text style={styles.itemName}>Week Starts On</Text>
+                <TouchableOpacity style={styles.item} onPress={() => router.push('/settings/practices' as any)}>
+                    <Text style={styles.itemName}>Practice Library</Text>
                     <View style={styles.itemRight}>
-                        <Text style={styles.itemValue}>{getSetting('week_starts_on', 'Monday')}</Text>
+                        <Text style={styles.itemValue}>{definitions.length} items</Text>
                         <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
                     </View>
                 </TouchableOpacity>

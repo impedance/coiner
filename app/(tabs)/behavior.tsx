@@ -1,18 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Modal, FlatList } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import { useBehavior } from '../../src/hooks/useBehavior';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { PracticeDefinition } from '../../src/types';
 
 export default function BehaviorScreen() {
-    const { activeCycle, definitions, checkins, streak, loading, startCycle, setCheckin, completeCycle } = useBehavior();
-    const [modalVisible, setModalVisible] = useState(false);
-    const [selectedPracticeIds, setSelectedPracticeIds] = useState<string[]>([]);
+    const { activeCycle, definitions, checkins, streak, loading, setCheckin, completeCycle } = useBehavior();
     const [showCompleteModal, setShowCompleteModal] = useState(false);
     const router = useRouter();
-
-    const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
     const cycleProgress = useMemo(() => {
         if (!activeCycle) return 0;
@@ -29,18 +24,6 @@ export default function BehaviorScreen() {
         return Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     }, [activeCycle]);
 
-    const handleStartCycle = async () => {
-        if (selectedPracticeIds.length === 0) return;
-        await startCycle("New Behavior Cycle", 21, selectedPracticeIds);
-        setModalVisible(false);
-    };
-
-    const togglePracticeSelection = (id: string) => {
-        setSelectedPracticeIds(prev => 
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
-    };
-
     if (loading) {
         return (
             <View style={styles.centered}>
@@ -51,12 +34,19 @@ export default function BehaviorScreen() {
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-            <Text style={styles.title}>Behavior</Text>
+            <View style={styles.header}>
+                <Text style={styles.title}>Behavior</Text>
+                {activeCycle && (
+                    <View style={[styles.modeBadge, activeCycle.mode === 'hard' && styles.modeBadgeHard]}>
+                        <Text style={styles.modeBadgeText}>{activeCycle.mode.toUpperCase()}</Text>
+                    </View>
+                )}
+            </View>
 
             {activeCycle ? (
                 <View style={styles.cycleCard}>
                     <View style={styles.cycleHeader}>
-                        <View>
+                        <View style={{ flex: 1 }}>
                             <Text style={styles.cycleTitle}>{activeCycle.title}</Text>
                             <Text style={styles.cycleSub}>Day {currentDay} of {activeCycle.duration_days}</Text>
                         </View>
@@ -121,21 +111,20 @@ export default function BehaviorScreen() {
                         style={styles.completeCycleButton}
                         onPress={() => setShowCompleteModal(true)}
                     >
-                        <Text style={styles.completeCycleButtonText}>Finish Cycle</Text>
+                        <Text style={styles.completeCycleButtonText}>Finish Cycle early</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
                 <View style={styles.emptyState}>
-                    <Ionicons name="rocket-outline" size={64} color="#007AFF" />
-                    <Text style={styles.emptyTitle}>Ready to grow?</Text>
-                    <Text style={styles.emptyText}>Start a 21-day behavior cycle to turn financial tracking into a permanent habit.</Text>
+                    <View style={styles.emptyIconContainer}>
+                        <Ionicons name="rocket-outline" size={64} color="#007AFF" />
+                    </View>
+                    <Text style={styles.emptyTitle}>Initiate Growth</Text>
+                    <Text style={styles.emptyText}>Behavior cycles are focused sprints to upgrade your lifestyle norms. Start a new one to begin tracking.</Text>
                     
                     <TouchableOpacity 
                         style={styles.startButton}
-                        onPress={() => {
-                            setSelectedPracticeIds(definitions.map(d => d.id));
-                            setModalVisible(true);
-                        }}
+                        onPress={() => router.push('/more/new-cycle' as any)}
                     >
                         <Text style={styles.startButtonText}>Start New Cycle</Text>
                     </TouchableOpacity>
@@ -156,49 +145,12 @@ export default function BehaviorScreen() {
                 <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
             </TouchableOpacity>
 
-            <Modal visible={modalVisible} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Choose Practices</Text>
-                        <FlatList
-                            data={definitions}
-                            keyExtractor={item => item.id}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity 
-                                    style={styles.selectionItem}
-                                    onPress={() => togglePracticeSelection(item.id)}
-                                >
-                                    <Ionicons 
-                                        name={selectedPracticeIds.includes(item.id) ? "checkbox" : "square-outline"} 
-                                        size={24} 
-                                        color="#007AFF" 
-                                    />
-                                    <Text style={styles.selectionText}>{item.title}</Text>
-                                </TouchableOpacity>
-                            )}
-                        />
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
-                                <Text style={styles.cancelButtonText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.confirmButton, selectedPracticeIds.length === 0 && styles.disabledButton]} 
-                                onPress={handleStartCycle}
-                                disabled={selectedPracticeIds.length === 0}
-                            >
-                                <Text style={styles.confirmButtonText}>Start 21-Day Cycle</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
-
             {/* Complete Cycle Modal */}
             <Modal visible={showCompleteModal} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Complete Cycle</Text>
-                        <Text style={styles.modalSub}>How did you do?</Text>
+                        <Text style={styles.modalTitle}>Cycle Ritual</Text>
+                        <Text style={styles.modalSub}>Every cycle completion is a step toward identity shift. How did this sprint go?</Text>
 
                         <TouchableOpacity
                             style={[styles.completeOption, { backgroundColor: '#34C759' }]}
@@ -219,14 +171,14 @@ export default function BehaviorScreen() {
                             }}
                         >
                             <Ionicons name="refresh" size={24} color="#FFFFFF" />
-                            <Text style={styles.completeOptionText}>Start Fresh (Reset)</Text>
+                            <Text style={styles.completeOptionText}>Abort & Start Fresh</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.cancelButton}
                             onPress={() => setShowCompleteModal(false)}
                         >
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                            <Text style={styles.cancelButtonText}>Continue Tracking</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -238,8 +190,12 @@ export default function BehaviorScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F2F2F7' },
     content: { padding: 20, paddingTop: 60 },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    title: { fontSize: 34, fontWeight: 'bold', marginBottom: 24 },
+    title: { fontSize: 34, fontWeight: 'bold' },
+    modeBadge: { backgroundColor: '#E5E5EA', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+    modeBadgeHard: { backgroundColor: '#FF3B30' },
+    modeBadgeText: { fontSize: 12, fontWeight: '800', color: '#1C1C1E' },
     cycleCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
     cycleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
     cycleTitle: { fontSize: 22, fontWeight: '800', color: '#1C1C1E' },
@@ -255,38 +211,32 @@ const styles = StyleSheet.create({
     practiceName: { fontSize: 17, fontWeight: '700', color: '#1C1C1E' },
     practiceScope: { fontSize: 13, color: '#8E8E93', textTransform: 'capitalize', marginTop: 2 },
     levelSelector: { flexDirection: 'row', gap: 8 },
-    levelBtn: { flex: 1, height: 44, borderRadius: 12, backgroundColor: '#E5E5EA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'transparent' },
+    levelBtn: { flex: 1, height: 44, borderRadius: 12, backgroundColor: '#E5E5EA', justifyContent: 'center', alignItems: 'center' },
     levelBtnMissed: { backgroundColor: '#FF3B30' },
     levelBtnMin: { backgroundColor: '#FF9500' },
     levelBtnOpt: { backgroundColor: '#007AFF' },
     levelBtnMax: { backgroundColor: '#34C759' },
     levelBtnText: { fontSize: 12, fontWeight: '800', color: '#8E8E93' },
     levelBtnTextActive: { color: '#FFFFFF' },
-    emptyState: { alignItems: 'center', marginTop: 60, padding: 20 },
-    emptyTitle: { fontSize: 26, fontWeight: '800', marginTop: 24, marginBottom: 12, color: '#1C1C1E' },
-    emptyText: { textAlign: 'center', color: '#8E8E93', fontSize: 17, lineHeight: 24, marginBottom: 36 },
-    startButton: { backgroundColor: '#007AFF', paddingHorizontal: 40, paddingVertical: 18, borderRadius: 18, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+    emptyState: { alignItems: 'center', marginTop: 40, padding: 20, backgroundColor: '#FFFFFF', borderRadius: 24, paddingVertical: 40 },
+    emptyIconContainer: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#F2F9FF', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+    emptyTitle: { fontSize: 26, fontWeight: '800', marginBottom: 12, color: '#1C1C1E' },
+    emptyText: { textAlign: 'center', color: '#8E8E93', fontSize: 16, lineHeight: 22, marginBottom: 32 },
+    startButton: { backgroundColor: '#007AFF', paddingHorizontal: 40, paddingVertical: 18, borderRadius: 18 },
     startButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-    modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: '85%' },
-    modalTitle: { fontSize: 24, fontWeight: '800', marginBottom: 20, color: '#1C1C1E' },
-    selectionItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
-    selectionText: { marginLeft: 16, fontSize: 17, fontWeight: '500' },
-    modalButtons: { flexDirection: 'row', gap: 14, marginTop: 32 },
-    cancelButton: { flex: 1, padding: 18, borderRadius: 16, alignItems: 'center', backgroundColor: '#F2F2F7' },
-    cancelButtonText: { color: '#8E8E93', fontSize: 17, fontWeight: '700' },
-    confirmButton: { flex: 2, padding: 18, borderRadius: 16, alignItems: 'center', backgroundColor: '#007AFF' },
-    confirmButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
-    disabledButton: { opacity: 0.5 },
-    moneyStepsLink: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginTop: 12, marginBottom: 40, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+    moneyStepsLink: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginTop: 12, marginBottom: 40 },
     moneyStepsIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' },
     moneyStepsText: { flex: 1, marginLeft: 16 },
     moneyStepsTitle: { fontSize: 18, fontWeight: '800', color: '#1C1C1E' },
     moneyStepsSub: { fontSize: 14, color: '#8E8E93', marginTop: 3 },
     completeCycleButton: { marginTop: 24, padding: 18, borderRadius: 16, backgroundColor: '#F2F2F7', alignItems: 'center' },
     completeCycleButtonText: { color: '#007AFF', fontSize: 17, fontWeight: '700' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24 },
+    modalTitle: { fontSize: 24, fontWeight: '800', marginBottom: 8, color: '#1C1C1E' },
     modalSub: { fontSize: 16, color: '#8E8E93', marginBottom: 24, lineHeight: 22 },
     completeOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 20, borderRadius: 16, gap: 12 },
     completeOptionText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+    cancelButton: { marginTop: 12, padding: 18, borderRadius: 16, alignItems: 'center' },
+    cancelButtonText: { color: '#8E8E93', fontSize: 17, fontWeight: '700' },
 });
-

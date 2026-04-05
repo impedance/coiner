@@ -1,10 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useDataSelection } from '../../src/hooks/useData';
 import { usePlanning } from '../../src/hooks/usePlanning';
 import { useReports } from '../../src/hooks/useReports';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { Theme, Colors, Typography } from '../../src/theme';
+import { GlassCard } from '../../src/components/GlassCard';
+import { AnimatedProgressBar } from '../../src/components/AnimatedProgressBar';
 
 export default function TodayScreen() {
     const { isReady: isDataReady, accounts, transactions } = useDataSelection();
@@ -23,10 +27,20 @@ export default function TodayScreen() {
 
     const isReady = isDataReady && !planningLoading && !reportsLoading;
 
+    const handleActionPress = useCallback((route: string) => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.push(route as any);
+    }, []);
+
+    const handleSoftPress = useCallback((route: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push(route as any);
+    }, []);
+
     if (!isReady) {
         return (
             <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator size="large" color={Colors.primary} />
             </View>
         );
     }
@@ -35,61 +49,61 @@ export default function TodayScreen() {
         transactions.reduce((sum, tx) => sum + (tx.type === 'income' ? tx.amount_cents : (tx.type === 'expense' ? -tx.amount_cents : 0)), 0);
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Today</Text>
-                <TouchableOpacity onPress={() => router.push('/settings')}>
-                    <Ionicons name="settings-outline" size={24} color="#8E8E93" />
+                <TouchableOpacity onPress={() => handleSoftPress('/settings')}>
+                    <Ionicons name="settings-outline" size={24} color={Colors.textSecondary} />
                 </TouchableOpacity>
             </View>
 
-            <View style={styles.balanceCard}>
+            <GlassCard style={styles.balanceCard}>
                 <Text style={styles.balanceLabel}>Total Balance</Text>
-                <Text style={styles.balanceAmount}>{(totalBalance / 100).toFixed(2)} €</Text>
+                <Text style={styles.balanceAmount}>{(totalBalance / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</Text>
 
                 <View style={styles.unassignedRow}>
                     <Text style={styles.unassignedLabel}>To be assigned:</Text>
-                    <Text style={[styles.unassignedAmount, { color: unassignedMoney > 0 ? '#34C759' : '#8E8E93' }]}>
+                    <Text style={[styles.unassignedAmount, { color: unassignedMoney > 0 ? Colors.income : Colors.textSecondary }]}>
                         {(unassignedMoney / 100).toFixed(2)} €
                     </Text>
                 </View>
-            </View>
+            </GlassCard>
 
             {/* Next Action Hint */}
             <TouchableOpacity 
                 style={styles.nextActionCard}
-                onPress={() => router.push(nextAction.route as any)}
+                onPress={() => handleSoftPress(nextAction.route)}
             >
                 <View style={styles.nextActionIcon}>
-                    <Ionicons name={nextAction.icon as any} size={24} color="#007AFF" />
+                    <Ionicons name={nextAction.icon as any} size={24} color={Colors.primary} />
                 </View>
                 <View style={styles.nextActionInfo}>
                     <Text style={styles.nextActionTitle}>{nextAction.title}</Text>
                     <Text style={styles.nextActionDesc}>{nextAction.desc}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+                <Ionicons name="chevron-forward" size={20} color={Colors.border} />
             </TouchableOpacity>
 
             <View style={styles.actions}>
                 <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: '#FF3B30' }]}
-                    onPress={() => router.push('/transaction/new?type=expense')}
+                    style={[styles.actionButton, { backgroundColor: Colors.expense }]}
+                    onPress={() => handleActionPress('/transaction/new?type=expense')}
                 >
                     <Ionicons name="remove-circle" size={24} color="#FFFFFF" />
                     <Text style={styles.actionButtonText}>Expense</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: '#34C759' }]}
-                    onPress={() => router.push('/transaction/new?type=income')}
+                    style={[styles.actionButton, { backgroundColor: Colors.income }]}
+                    onPress={() => handleActionPress('/transaction/new?type=income')}
                 >
                     <Ionicons name="add-circle" size={24} color="#FFFFFF" />
                     <Text style={styles.actionButtonText}>Income</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: '#007AFF' }]}
-                    onPress={() => router.push('/transaction/new?type=transfer')}
+                    style={[styles.actionButton, { backgroundColor: Colors.primary }]}
+                    onPress={() => handleActionPress('/transaction/new?type=transfer')}
                 >
                     <Ionicons name="swap-horizontal" size={24} color="#FFFFFF" />
                     <Text style={styles.actionButtonText}>Transfer</Text>
@@ -102,93 +116,65 @@ export default function TodayScreen() {
                 
                 <View style={styles.statsGrid}>
                     {/* Reserve */}
-                    <View style={styles.statCard}>
+                    <GlassCard style={styles.statCard}>
                         <View style={styles.statHeader}>
-                            <Ionicons name="shield-checkmark" size={16} color="#FF9500" />
+                            <Ionicons name="shield-checkmark" size={16} color={Colors.reserve} />
                             <Text style={styles.statLabel}>Reserve</Text>
                         </View>
                         <Text style={styles.statValue}>{(reserveTrend.current / 100).toFixed(0)}€</Text>
-                        <View style={styles.miniProgressBar}>
-                            <View 
-                                style={[
-                                    styles.miniProgressFill, 
-                                    { 
-                                        width: `${Math.min(1, reserveTrend.target > 0 ? reserveTrend.current / reserveTrend.target : 0) * 100}%`,
-                                        backgroundColor: '#FF9500' 
-                                    }
-                                ]} 
-                            />
-                        </View>
-                    </View>
+                        <AnimatedProgressBar 
+                            progress={reserveTrend.target > 0 ? reserveTrend.current / reserveTrend.target : 0}
+                            color={Colors.reserve}
+                        />
+                    </GlassCard>
 
                     {/* Joy Fund */}
-                    <View style={styles.statCard}>
+                    <GlassCard style={styles.statCard}>
                         <View style={styles.statHeader}>
-                            <Ionicons name="heart" size={16} color="#FF2D55" />
+                            <Ionicons name="heart" size={16} color={Colors.joy} />
                             <Text style={styles.statLabel}>Joy Fund</Text>
                         </View>
                         <Text style={styles.statValue}>{(joyTrend.current / 100).toFixed(0)}€</Text>
-                        <View style={styles.miniProgressBar}>
-                            <View 
-                                style={[
-                                    styles.miniProgressFill, 
-                                    { 
-                                        width: `${Math.min(1, joyTrend.target > 0 ? joyTrend.current / joyTrend.target : 0) * 100}%`,
-                                        backgroundColor: '#FF2D55' 
-                                    }
-                                ]} 
-                            />
-                        </View>
-                    </View>
+                        <AnimatedProgressBar 
+                            progress={joyTrend.target > 0 ? joyTrend.current / joyTrend.target : 0}
+                            color={Colors.joy}
+                        />
+                    </GlassCard>
 
                     {/* Goals */}
-                    <View style={styles.statCard}>
+                    <GlassCard style={styles.statCard}>
                         <View style={styles.statHeader}>
                             <Ionicons name="trophy" size={16} color="#FFCC00" />
                             <Text style={styles.statLabel}>Goals</Text>
                         </View>
                         <Text style={styles.statValue}>{goalsSummary.count} Active</Text>
-                        <View style={styles.miniProgressBar}>
-                            <View 
-                                style={[
-                                    styles.miniProgressFill, 
-                                    { 
-                                        width: `${goalsSummary.percentage * 100}%`,
-                                        backgroundColor: '#FFCC00' 
-                                    }
-                                ]} 
-                            />
-                        </View>
-                    </View>
+                        <AnimatedProgressBar 
+                            progress={goalsSummary.percentage}
+                            color="#FFCC00"
+                        />
+                    </GlassCard>
 
                     {/* Cycle */}
-                    <View style={styles.statCard}>
+                    <GlassCard style={styles.statCard}>
                         <View style={styles.statHeader}>
-                            <Ionicons name="repeat" size={16} color="#5856D6" />
+                            <Ionicons name="repeat" size={16} color={Colors.secondary} />
                             <Text style={styles.statLabel}>Cycle</Text>
                         </View>
                         <Text style={styles.statValue}>
                             {cycleSummary ? `${cycleSummary.daysLeft}d left` : 'No Cycle'}
                         </Text>
-                        <View style={styles.miniProgressBar}>
-                            <View 
-                                style={[
-                                    styles.miniProgressFill, 
-                                    { 
-                                        width: `${(cycleSummary?.progress || 0) * 100}%`,
-                                        backgroundColor: '#5856D6' 
-                                    }
-                                ]} 
-                            />
-                        </View>
-                    </View>
+                        <AnimatedProgressBar 
+                            progress={cycleSummary?.progress || 0}
+                            color={Colors.secondary}
+                        />
+                    </GlassCard>
                 </View>
             </View>
 
             <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Recent Activity</Text>
-                    <TouchableOpacity onPress={() => router.push('/report')}>
+                    <TouchableOpacity onPress={() => handleSoftPress('/report')}>
                         <Text style={styles.seeAllText}>See Reports</Text>
                     </TouchableOpacity>
                 </View>
@@ -201,7 +187,7 @@ export default function TodayScreen() {
                                 <Text style={styles.txNote}>{tx.note || 'Transaction'}</Text>
                                 <Text style={styles.txDate}>{new Date(tx.happened_at).toLocaleDateString()}</Text>
                             </View>
-                            <Text style={[styles.txAmount, { color: tx.type === 'expense' ? '#FF3B30' : '#34C759' }]}>
+                            <Text style={[styles.txAmount, { color: tx.type === 'expense' ? Colors.expense : Colors.income }]}>
                                 {tx.type === 'expense' ? '-' : '+'}{(tx.amount_cents / 100).toFixed(2)} €
                             </Text>
                         </View>
@@ -212,7 +198,7 @@ export default function TodayScreen() {
             {accounts.length === 0 && (
                 <TouchableOpacity
                     style={styles.setupButton}
-                    onPress={() => router.push('/settings')}
+                    onPress={() => handleSoftPress('/settings')}
                 >
                     <Ionicons name="warning-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
                     <Text style={styles.setupButtonText}>Setup your first account</Text>
@@ -223,42 +209,40 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F2F2F7' },
+    container: { flex: 1, backgroundColor: Colors.background },
     content: { padding: 20, paddingTop: 60 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    headerTitle: { fontSize: 34, fontWeight: 'bold', color: '#000000' },
-    balanceCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 3, marginBottom: 24 },
-    balanceLabel: { fontSize: 16, color: '#8E8E93', marginBottom: 4, fontWeight: '500' },
-    balanceAmount: { fontSize: 40, fontWeight: '800', color: '#000000', marginBottom: 16, letterSpacing: -1 },
-    unassignedRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F2F2F7', paddingTop: 16 },
-    unassignedLabel: { fontSize: 14, color: '#3A3A3C', marginRight: 8 },
-    unassignedAmount: { fontSize: 14, fontWeight: '700' },
-    nextActionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: '#E5E5EA', gap: 12 },
-    nextActionIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#F2F9FF', justifyContent: 'center', alignItems: 'center' },
+    headerTitle: { ...Typography.h1 },
+    balanceCard: { marginBottom: 24, padding: 24 },
+    balanceLabel: { ...Typography.label, marginBottom: 8 },
+    balanceAmount: { ...Typography.h1, fontSize: 40, marginBottom: 16 },
+    unassignedRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 16 },
+    unassignedLabel: { ...Typography.body, fontSize: 14, marginRight: 8 },
+    unassignedAmount: { ...Typography.bodyBold, fontSize: 14 },
+    nextActionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card, borderRadius: 24, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: Colors.glassBorder, gap: 12 },
+    nextActionIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'hsla(210, 100%, 95%, 1)', justifyContent: 'center', alignItems: 'center' },
     nextActionInfo: { flex: 1 },
-    nextActionTitle: { fontSize: 16, fontWeight: '700', color: '#1C1C1E' },
-    nextActionDesc: { fontSize: 14, color: '#8E8E93', marginTop: 2 },
+    nextActionTitle: { ...Typography.bodyBold },
+    nextActionDesc: { ...Typography.small, marginTop: 2 },
     actions: { flexDirection: 'row', gap: 12, marginBottom: 32 },
-    actionButton: { flex: 1, padding: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 8, elevation: 2 },
-    actionButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+    actionButton: { flex: 1, padding: 16, borderRadius: 20, alignItems: 'center', justifyContent: 'center', gap: 8, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
+    actionButtonText: { ...Typography.bodyBold, color: '#FFFFFF', fontSize: 14 },
     section: { marginBottom: 32 },
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    sectionTitle: { fontSize: 20, fontWeight: '800', marginBottom: 16, color: '#1C1C1E' },
-    seeAllText: { color: '#007AFF', fontWeight: '600' },
+    sectionTitle: { ...Typography.h2, marginBottom: 0 },
+    seeAllText: { ...Typography.bodyMedium, color: Colors.primary, fontSize: 14 },
     statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    statCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, width: '48%', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
-    statHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-    statLabel: { fontSize: 12, color: '#8E8E93', fontWeight: '600', textTransform: 'uppercase' },
-    statValue: { fontSize: 18, fontWeight: '800', color: '#1C1C1E', marginBottom: 10 },
-    miniProgressBar: { height: 4, backgroundColor: '#F2F2F7', borderRadius: 2, overflow: 'hidden' },
-    miniProgressFill: { height: '100%', borderRadius: 2 },
-    txItem: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
+    statCard: { width: '48%', padding: 16 },
+    statHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+    statLabel: { ...Typography.label, fontSize: 10 },
+    statValue: { ...Typography.h3, marginBottom: 12 },
+    txItem: { backgroundColor: Colors.card, padding: 16, borderRadius: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: Colors.glassBorder },
     txInfo: { flex: 1 },
-    txNote: { fontSize: 16, fontWeight: '600', color: '#1C1C1E', marginBottom: 2 },
-    txDate: { fontSize: 12, color: '#8E8E93' },
-    txAmount: { fontSize: 16, fontWeight: '700' },
-    emptyText: { color: '#C7C7CC', fontStyle: 'italic', textAlign: 'center', padding: 20 },
-    setupButton: { backgroundColor: '#007AFF', padding: 18, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
-    setupButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+    txNote: { ...Typography.bodyMedium },
+    txDate: { ...Typography.small },
+    txAmount: { ...Typography.bodyBold },
+    emptyText: { ...Typography.body, color: Colors.textSecondary, fontStyle: 'italic', textAlign: 'center', padding: 20 },
+    setupButton: { backgroundColor: Colors.primary, padding: 18, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+    setupButtonText: { ...Typography.bodyBold, color: '#FFFFFF' },
 });

@@ -143,6 +143,12 @@ export function useReports() {
         };
     }, [transactions, plans, cycles, activeMonthKey]);
 
+    const monthPace = useMemo(() => {
+        const now = new Date();
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        return now.getDate() / daysInMonth;
+    }, []);
+
     return {
         spendingByCategory,
         incomeVsExpense,
@@ -154,6 +160,7 @@ export function useReports() {
         setMonthOffset,
         activeMonthKey,
         nextAction,
+        monthPace,
         loading: !isReady || loading,
     };
 }

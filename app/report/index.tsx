@@ -7,7 +7,7 @@ export default function ReportsScreen() {
     const { 
         spendingByCategory, incomeVsExpense, reserveTrend, joyTrend, 
         goalsSummary, cycleSummary, monthOffset, setMonthOffset, 
-        activeMonthKey, loading 
+        activeMonthKey, monthPace, loading 
     } = useReports();
 
     if (loading) {
@@ -70,32 +70,64 @@ export default function ReportsScreen() {
             <View style={styles.card}>
                 <View style={styles.cardHeader}>
                     <Text style={styles.cardTitle}>Joy Fund Usage</Text>
-                    <Ionicons name="heart" size={20} color="#FF2D55" />
-                </View>
-                <View style={styles.statsRow}>
-                    <View>
-                        <Text style={styles.statsMain}>{(joyTrend.current / 100).toFixed(0)}€</Text>
-                        <Text style={styles.statsSub}>spent of {(joyTrend.target / 100).toFixed(0)}€ bucket</Text>
-                    </View>
-                    <View style={styles.statsIconBox}>
-                        <Ionicons 
-                            name={joyTrend.current > joyTrend.target ? "alert-circle" : "checkmark-circle"} 
-                            size={32} 
-                            color={joyTrend.current > joyTrend.target ? "#FF3B30" : "#34C759"} 
-                        />
+                    <View style={styles.joyBadge}>
+                        <Ionicons name="heart" size={12} color="#FF2D55" />
+                        <Text style={styles.joyBadgeText}>LIFESTYLE</Text>
                     </View>
                 </View>
+                
+                <View style={styles.joyHero}>
+                    <View style={styles.joyHeroLeft}>
+                        <Text style={styles.joyHeroValue}>{(joyTrend.current / 100).toFixed(0)}€</Text>
+                        <Text style={styles.joyHeroLabel}>spent this month</Text>
+                    </View>
+                    <View style={styles.joyHeroRight}>
+                        <Text style={styles.joyHeroLimit}>Target: {(joyTrend.target / 100).toFixed(0)}€</Text>
+                        <View style={styles.joyStatus}>
+                            <Text style={[styles.joyStatusText, { color: joyTrend.current > joyTrend.target ? '#FF3B30' : '#34C759' }]}>
+                                {joyTrend.current > joyTrend.target ? 'OVER LIMIT' : 'ON TRACK'}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+
                 <View style={styles.progressBarContainer}>
                     <View 
                         style={[
                             styles.progressBar, 
                             { 
                                 width: `${Math.min(1, joyTrend.target > 0 ? joyTrend.current / joyTrend.target : 0) * 100}%`,
-                                backgroundColor: '#FF2D55'
+                                backgroundColor: (joyTrend.current / joyTrend.target) > monthPace ? '#FF3B30' : '#FF2D55'
+                            }
+                        ]} 
+                    />
+                    {/* Pace Marker */}
+                    <View 
+                        style={[
+                            { 
+                                position: 'absolute', 
+                                left: `${monthPace * 100}%`, 
+                                width: 2, 
+                                height: 8, 
+                                backgroundColor: '#1C1C1E',
+                                zIndex: 1
                             }
                         ]} 
                     />
                 </View>
+                
+                <View style={styles.paceIndicator}>
+                    <Text style={[styles.paceText, { color: (joyTrend.current / joyTrend.target) > monthPace ? '#FF3B30' : '#34C759' }]}>
+                        {(joyTrend.current / joyTrend.target) > monthPace ? '▲ SKEWED' : '▼ LINEAR'}
+                    </Text>
+                    <Text style={styles.paceSubText}>Targets month progress: {(monthPace * 100).toFixed(0)}%</Text>
+                </View>
+                
+                <Text style={styles.joyHint}>
+                    {joyTrend.current > joyTrend.target 
+                        ? "You've exceeded your joy bucket. Consider pulling from Reserve or reducing next month's joy." 
+                        : "You have plenty of guilt-free spending power left! Enjoy it."}
+                </Text>
             </View>
 
             {/* Spending by Category */}
@@ -238,7 +270,6 @@ const styles = StyleSheet.create({
     statsMain: { fontSize: 32, fontWeight: '800', color: '#1C1C1E' },
     statsSub: { fontSize: 14, color: '#8E8E93', marginTop: 2 },
     statsRight: { fontSize: 14, fontWeight: '600', color: '#1C1C1E' },
-    statsIconBox: { justifyContent: 'center' },
     categoryItem: { marginBottom: 14 },
     categoryHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
     categoryName: { fontSize: 15, fontWeight: '500', color: '#1C1C1E' },
@@ -258,4 +289,18 @@ const styles = StyleSheet.create({
     reserveMain: { fontSize: 36, fontWeight: '800', color: '#1C1C1E' },
     reserveTarget: { fontSize: 15, color: '#8E8E93', marginTop: 4 },
     emptyText: { textAlign: 'center', color: '#C7C7CC', paddingVertical: 20, fontStyle: 'italic' },
+    joyBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF2F5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 },
+    joyBadgeText: { fontSize: 10, fontWeight: '800', color: '#FF2D55' },
+    joyHero: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 12 },
+    joyHeroLeft: { flex: 1 },
+    joyHeroValue: { fontSize: 32, fontWeight: '800', color: '#1C1C1E' },
+    joyHeroLabel: { fontSize: 13, color: '#8E8E93', marginTop: 2 },
+    joyHeroRight: { alignItems: 'flex-end' },
+    joyHeroLimit: { fontSize: 14, fontWeight: '600', color: '#1C1C1E' },
+    joyStatus: { marginTop: 4 },
+    joyStatusText: { fontSize: 12, fontWeight: '800' },
+    joyHint: { fontSize: 13, color: '#8E8E93', marginTop: 16, lineHeight: 18, fontStyle: 'italic' },
+    paceIndicator: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, backgroundColor: '#F2F2F7', padding: 8, borderRadius: 8 },
+    paceText: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+    paceSubText: { fontSize: 11, color: '#8E8E93' },
 });

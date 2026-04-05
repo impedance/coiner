@@ -86,7 +86,7 @@ export function useBehavior() {
         return currentStreak;
     }, [activeCycle, allCycleCheckins]);
 
-    const startCycle = async (title: string, days: number, practiceIds: string[]) => {
+    const startCycle = async (title: string, days: number, practiceIds: string[], mode: 'soft' | 'hard' = 'soft', targetLevel: 'minimum' | 'target' | 'hero' = 'minimum') => {
         const now = new Date();
         const end = new Date();
         end.setDate(now.getDate() + days);
@@ -96,9 +96,9 @@ export function useBehavior() {
             duration_days: days,
             start_date: now.toISOString(),
             end_date: end.toISOString(),
-            mode: 'soft',
+            mode,
             status: 'active',
-            target_level: 'minimum',
+            target_level: targetLevel,
         }, practiceIds);
 
         await refresh();
@@ -121,6 +121,16 @@ export function useBehavior() {
         await refresh();
     };
 
+    const createDefinition = async (title: string, code: string) => {
+        await practiceRepository.createDefinition({
+            title,
+            code,
+            scope: 'daily',
+            is_system: false,
+        });
+        await refresh();
+    };
+
     return {
         activeCycle,
         definitions,
@@ -129,6 +139,7 @@ export function useBehavior() {
         loading,
         startCycle,
         setCheckin,
+        createDefinition,
         completeCycle,
         refresh,
     };
