@@ -115,6 +115,26 @@ export default function TodayScreen() {
                 <Text style={styles.sectionTitle}>Progress Overview</Text>
                 
                 <View style={styles.statsGrid}>
+                    {/* Cycle & Streak */}
+                    <TouchableOpacity 
+                        style={styles.streakCardContainer}
+                        onPress={() => handleSoftPress('/behavior')}
+                    >
+                        <GlassCard style={styles.streakCard}>
+                            <View style={{ flex: 1 }}>
+                                <View style={styles.statHeader}>
+                                    <Ionicons name="flame" size={20} color="#FF5E00" />
+                                    <Text style={[styles.statLabel, { color: '#FF5E00', fontWeight: '800' }]}>Practice Streak</Text>
+                                </View>
+                                <Text style={[styles.statValue, { fontSize: 32 }]}>{(cycleSummary as any)?.streak || 0} Days</Text>
+                                <Text style={styles.smallLabel}>Keep it up! {cycleSummary?.daysLeft} days left in cycle.</Text>
+                            </View>
+                            <View style={styles.streakWheel}>
+                                <Ionicons name="ribbon" size={40} color="#FFCC00" />
+                            </View>
+                        </GlassCard>
+                    </TouchableOpacity>
+
                     {/* Reserve */}
                     <GlassCard style={styles.statCard}>
                         <View style={styles.statHeader}>
@@ -140,36 +160,26 @@ export default function TodayScreen() {
                             color={Colors.joy}
                         />
                     </GlassCard>
-
-                    {/* Goals */}
-                    <GlassCard style={styles.statCard}>
-                        <View style={styles.statHeader}>
-                            <Ionicons name="trophy" size={16} color="#FFCC00" />
-                            <Text style={styles.statLabel}>Goals</Text>
-                        </View>
-                        <Text style={styles.statValue}>{goalsSummary.count} Active</Text>
-                        <AnimatedProgressBar 
-                            progress={goalsSummary.percentage}
-                            color="#FFCC00"
-                        />
-                    </GlassCard>
-
-                    {/* Cycle */}
-                    <GlassCard style={styles.statCard}>
-                        <View style={styles.statHeader}>
-                            <Ionicons name="repeat" size={16} color={Colors.secondary} />
-                            <Text style={styles.statLabel}>Cycle</Text>
-                        </View>
-                        <Text style={styles.statValue}>
-                            {cycleSummary ? `${cycleSummary.daysLeft}d left` : 'No Cycle'}
-                        </Text>
-                        <AnimatedProgressBar 
-                            progress={cycleSummary?.progress || 0}
-                            color={Colors.secondary}
-                        />
-                    </GlassCard>
                 </View>
             </View>
+
+            {/* Daily Practice Reminder if active cycle exists */}
+            {cycleSummary && (
+                <View style={styles.section}>
+                    <TouchableOpacity onPress={() => handleSoftPress('/behavior')}>
+                        <GlassCard style={styles.reminderCard}>
+                            <View style={styles.reminderIcon}>
+                                <Ionicons name="notifications" size={24} color="#FFF" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.reminderTitle}>Daily Awareness Check</Text>
+                                <Text style={styles.reminderDesc}>Don't forget to check in your practices today!</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+                        </GlassCard>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             <View style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -210,7 +220,7 @@ export default function TodayScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
-    content: { padding: 20, paddingTop: 60 },
+    content: { padding: 20, paddingTop: 60, paddingBottom: 100 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     headerTitle: { ...Typography.h1 },
@@ -234,9 +244,17 @@ const styles = StyleSheet.create({
     seeAllText: { ...Typography.bodyMedium, color: Colors.primary, fontSize: 14 },
     statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     statCard: { width: '48%', padding: 16 },
+    streakCardContainer: { width: '100%', marginBottom: 4 },
+    streakCard: { padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     statHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
     statLabel: { ...Typography.label, fontSize: 10 },
     statValue: { ...Typography.h3, marginBottom: 12 },
+    streakWheel: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255, 204, 0, 0.1)', justifyContent: 'center', alignItems: 'center' },
+    smallLabel: { ...Typography.small, fontSize: 10 },
+    reminderCard: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12, backgroundColor: 'hsla(210, 100%, 50%, 0.1)', borderColor: Colors.primary },
+    reminderIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+    reminderTitle: { ...Typography.bodyBold, fontSize: 14 },
+    reminderDesc: { ...Typography.small, color: Colors.textSecondary },
     txItem: { backgroundColor: Colors.card, padding: 16, borderRadius: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: Colors.glassBorder },
     txInfo: { flex: 1 },
     txNote: { ...Typography.bodyMedium },

@@ -34,6 +34,7 @@ export class WeeklyReviewRepository {
                     joy_delta_cents = ?, 
                     reflection = ?, 
                     next_focus = ?, 
+                    celebrations = ?, 
                     updated_at = ? 
                 WHERE id = ?`,
                 review.income_cents ?? existing.income_cents,
@@ -42,6 +43,7 @@ export class WeeklyReviewRepository {
                 review.joy_delta_cents ?? existing.joy_delta_cents,
                 review.reflection ?? existing.reflection ?? null,
                 review.next_focus ?? existing.next_focus ?? null,
+                review.celebrations ?? existing.celebrations ?? null,
                 now,
                 existing.id
             );
@@ -50,8 +52,8 @@ export class WeeklyReviewRepository {
             await db.runAsync(
                 `INSERT INTO weekly_reviews (
                     id, week_key, period_start, period_end, income_cents, expense_cents, 
-                    reserve_delta_cents, joy_delta_cents, reflection, next_focus, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    reserve_delta_cents, joy_delta_cents, reflection, next_focus, celebrations, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 id,
                 review.week_key,
                 review.period_start,
@@ -62,6 +64,7 @@ export class WeeklyReviewRepository {
                 review.joy_delta_cents ?? 0,
                 review.reflection ?? null,
                 review.next_focus ?? null,
+                review.celebrations ?? null,
                 now,
                 now
             );

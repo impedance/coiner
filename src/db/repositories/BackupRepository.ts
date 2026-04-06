@@ -2,7 +2,7 @@ import { getDatabase } from '../client/sqlite';
 
 export class BackupRepository {
     private tables = [
-        'accounts', 'categories', 'transactions', 'monthly_bucket_plans', 
+        'accounts', 'category_groups', 'categories', 'transactions', 'monthly_bucket_plans', 
         'goals', 'goal_contributions', 'weekly_reviews', 'artifacts', 
         'practice_definitions', 'cycles', 'cycle_practices', 
         'practice_checkins', 'app_settings', 'money_steps'

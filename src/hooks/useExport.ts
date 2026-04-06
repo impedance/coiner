@@ -109,7 +109,9 @@ export function useExport() {
                                         setLoading(true);
                                         try {
                                             await backupRepository.clearAllData();
-                                            Alert.alert('Success', 'All local data has been cleared.');
+                                            const { seedSystemData } = await import('../db/seeds/system');
+                                            await seedSystemData();
+                                            Alert.alert('Success', 'Local data has been reset to system defaults.');
                                             if (onSuccess) onSuccess();
                                         } catch (e) {
                                             console.error('Reset failed:', e);

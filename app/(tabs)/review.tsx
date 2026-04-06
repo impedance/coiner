@@ -1,10 +1,14 @@
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useWeeklyReview } from '../../src/hooks/useWeeklyReview';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors, Typography } from '../../src/theme';
+import { GlassCard } from '../../src/components/GlassCard';
+import { SimpleBarChart } from '../../src/components/SimpleBarChart';
+import { CelebrationCard } from '../../src/components/CelebrationCard';
+import * as Haptics from 'expo-haptics';
 
 export default function ReviewScreen() {
-    // Current week calculation
     const { weekKey, periodStart, periodEnd } = useMemo(() => {
         const now = new Date();
         const start = new Date(now);
@@ -27,30 +31,48 @@ export default function ReviewScreen() {
         };
     }, []);
 
-    const { review, stats, loading, saveReview } = useWeeklyReview(weekKey, periodStart, periodEnd);
+    const { review, stats, history, loading, saveReview } = useWeeklyReview(weekKey, periodStart, periodEnd);
 
     const [reflection, setReflection] = useState('');
     const [nextFocus, setNextFocus] = useState('');
+    const [celebrations, setCelebrations] = useState('');
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (review) {
             setReflection(review.reflection || '');
             setNextFocus(review.next_focus || '');
+            setCelebrations(review.celebrations || '');
         }
     }, [review]);
 
     if (loading) {
         return (
             <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator size="large" color={Colors.primary} />
             </View>
         );
     }
 
     const handleSave = async () => {
-        await saveReview({ reflection, next_focus: nextFocus });
-        alert('Weekly review saved!');
+        await saveReview({ reflection, next_focus: nextFocus, celebrations });
+        if (Platform.OS !== 'web') {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        Alert.alert('Success', 'Weekly review saved!');
     };
+
+    const chartData = history.map(r => ({
+        label: `W${r.week_key.split('-')[1]}`,
+        value: r.reserve_delta_cents / 100
+    }));
+
+    // Add current week to chart data if not already there
+    if (!history.find(r => r.week_key === weekKey)) {
+        chartData.push({
+            label: `W${weekKey.split('-')[1]}`,
+            value: stats.reserve_delta / 100
+        });
+    }
 
     return (
         <KeyboardAvoidingView
@@ -58,47 +80,86 @@ export default function ReviewScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={100}
         >
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Weekly Review</Text>
                     <Text style={styles.subtitle}>Week {weekKey.split('-')[1]}, {new Date(periodStart).toLocaleDateString()} - {new Date(periodEnd).toLocaleDateString()}</Text>
                 </View>
 
-                <View style={styles.statsCard}>
+                {/* Main Stats Card */}
+                <GlassCard style={styles.statsCard}>
                     <View style={styles.statRow}>
                         <View style={styles.statBox}>
                             <Text style={styles.statLabel}>Income</Text>
-                            <Text style={[styles.statValue, { color: '#34C759' }]}>{(stats.income / 100).toFixed(2)} €</Text>
+                            <Text style={[styles.statValue, { color: Colors.income }]}>{(stats.income / 100).toFixed(2)} €</Text>
                         </View>
                         <View style={styles.statBox}>
                             <Text style={styles.statLabel}>Expenses</Text>
-                            <Text style={[styles.statValue, { color: '#FF3B30' }]}>{(stats.expense / 100).toFixed(2)} €</Text>
+                            <Text style={[styles.statValue, { color: Colors.expense }]}>{(stats.expense / 100).toFixed(2)} €</Text>
                         </View>
                     </View>
                     <View style={styles.netRow}>
                         <Text style={styles.netLabel}>Net Cash Flow</Text>
-                        <Text style={[styles.netValue, { color: stats.income - stats.expense >= 0 ? '#34C759' : '#FF3B30' }]}>
+                        <Text style={[styles.netValue, { color: stats.income - stats.expense >= 0 ? Colors.income : Colors.expense }]}>
                             {((stats.income - stats.expense) / 100).toFixed(2)} €
                         </Text>
                     </View>
+                </GlassCard>
+
+                {/* Reserve & Joy Highlights */}
+                <View style={styles.highlightsContainer}>
+                    <GlassCard style={styles.highlightCard}>
+                        <Ionicons name="shield-checkmark" size={20} color={Colors.reserve} style={{ marginBottom: 8 }} />
+                        <Text style={styles.highlightLabel}>Reserve Delta</Text>
+                        <Text style={styles.highlightValue}>{(stats.reserve_delta / 100).toFixed(2)} €</Text>
+                    </GlassCard>
+                    <GlassCard style={styles.highlightCard}>
+                        <Ionicons name="heart" size={20} color={Colors.joy} style={{ marginBottom: 8 }} />
+                        <Text style={styles.highlightLabel}>Joy Delta</Text>
+                        <Text style={styles.highlightValue}>{(stats.joy_delta / 100).toFixed(2)} €</Text>
+                    </GlassCard>
                 </View>
 
+                {/* Visualization Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Reserve Dynamics</Text>
+                    <GlassCard style={styles.chartCard}>
+                        <SimpleBarChart data={chartData} color={Colors.reserve} height={120} />
+                    </GlassCard>
+                </View>
+
+                {/* Celebrations Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Weekly Wins</Text>
+                    <Text style={styles.sectionDesc}>What financial wins did you have this week?</Text>
+                    {celebrations.length > 20 && !loading && (
+                        <CelebrationCard title="Great Progress!" description={celebrations} />
+                    )}
+                    <TextInput
+                        style={styles.textArea}
+                        multiline
+                        numberOfLines={3}
+                        placeholder="e.g., Avoided an impulse purchase, reached 50% of travel goal..."
+                        value={celebrations}
+                        onChangeText={setCelebrations}
+                    />
+                </View>
+
+                {/* Reflection Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Reflection</Text>
-                    <Text style={styles.sectionDesc}>What went well this week? Where did you struggle?</Text>
                     <TextInput
                         style={styles.textArea}
                         multiline
                         numberOfLines={4}
-                        placeholder="Write your thoughts here..."
+                        placeholder="Write your deeper thoughts here..."
                         value={reflection}
                         onChangeText={setReflection}
                     />
                 </View>
 
-                <View style={styles.section}>
+                <View style={[styles.section, { marginBottom: 40 }]}>
                     <Text style={styles.sectionTitle}>Next Week's Focus</Text>
-                    <Text style={styles.sectionDesc}>What is your primary financial goal for next week?</Text>
                     <TextInput
                         style={styles.input}
                         placeholder="e.g., No dining out, save 50€ more..."
@@ -113,8 +174,8 @@ export default function ReviewScreen() {
 
                 {review && (
                     <View style={styles.completedBadge}>
-                        <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-                        <Text style={styles.completedText}>Review completed on {new Date(review.updated_at).toLocaleDateString()}</Text>
+                        <Ionicons name="checkmark-circle" size={20} color={Colors.income} />
+                        <Text style={styles.completedText}>Review completed</Text>
                     </View>
                 )}
             </ScrollView>
@@ -123,32 +184,33 @@ export default function ReviewScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F2F2F7' },
+    container: { flex: 1, backgroundColor: Colors.background },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     scrollView: { flex: 1 },
-    content: { padding: 20 },
+    content: { padding: 20, paddingBottom: 60 },
     header: { marginBottom: 24, paddingTop: 60 },
-    title: { fontSize: 34, fontWeight: '700', marginBottom: 4 },
-    subtitle: { fontSize: 16, color: '#8E8E93' },
-    statsCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, marginBottom: 24, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 10 },
+    title: { ...Typography.h1 },
+    subtitle: { ...Typography.small, color: Colors.textSecondary },
+    statsCard: { padding: 20, marginBottom: 20 },
     statRow: { flexDirection: 'row', marginBottom: 20 },
     statBox: { flex: 1 },
-    statLabel: { fontSize: 13, color: '#8E8E93', textTransform: 'uppercase', marginBottom: 4, fontWeight: '600' },
-    statValue: { fontSize: 24, fontWeight: '700' },
-    movementRow: { flexDirection: 'column', gap: 12, marginBottom: 20, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F2F2F7' },
-    movementItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    movementLabel: { fontSize: 15, color: '#48484A', flex: 1 },
-    movementValue: { fontSize: 15, fontWeight: '600', color: '#1C1C1E' },
-    netRow: { borderTopWidth: 1, borderTopColor: '#F2F2F7', paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    netLabel: { fontSize: 17, fontWeight: '600' },
-    netValue: { fontSize: 20, fontWeight: '700' },
+    statLabel: { ...Typography.label },
+    statValue: { ...Typography.h2 },
+    netRow: { borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    netLabel: { ...Typography.bodyBold },
+    netValue: { ...Typography.h2, fontSize: 24 },
+    highlightsContainer: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+    highlightCard: { flex: 1, padding: 16 },
+    highlightLabel: { ...Typography.small, fontSize: 10, textTransform: 'uppercase' },
+    highlightValue: { ...Typography.bodyBold, fontSize: 18 },
     section: { marginBottom: 24 },
-    sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 4, color: '#1C1C1E' },
-    sectionDesc: { fontSize: 14, color: '#8E8E93', marginBottom: 12 },
-    textArea: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, fontSize: 16, minHeight: 120, textAlignVertical: 'top', borderWidth: 1, borderColor: '#E5E5EA' },
-    input: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, fontSize: 16, borderWidth: 1, borderColor: '#E5E5EA' },
-    saveButton: { backgroundColor: '#007AFF', padding: 18, borderRadius: 16, alignItems: 'center', marginTop: 12 },
+    sectionTitle: { ...Typography.h3, marginBottom: 8 },
+    sectionDesc: { ...Typography.small, marginBottom: 12 },
+    chartCard: { padding: 12, paddingBottom: 24 },
+    textArea: { backgroundColor: Colors.card, borderRadius: 20, padding: 16, fontSize: 16, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: Colors.glassBorder, color: Colors.text },
+    input: { backgroundColor: Colors.card, borderRadius: 20, padding: 16, fontSize: 16, borderWidth: 1, borderColor: Colors.glassBorder, color: Colors.text },
+    saveButton: { backgroundColor: Colors.primary, padding: 18, borderRadius: 20, alignItems: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
     saveButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
     completedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 20, gap: 8 },
-    completedText: { color: '#34C759', fontSize: 14, fontWeight: '600' },
+    completedText: { color: Colors.income, fontSize: 14, fontWeight: '600' },
 });

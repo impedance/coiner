@@ -201,6 +201,10 @@ const MIGRATIONS = [
 
   ALTER TABLE categories ADD COLUMN group_id TEXT;
   `,
+  // Version 7: Celebrations column for Weekly Review
+  `
+  ALTER TABLE weekly_reviews ADD COLUMN celebrations TEXT;
+  `,
 ];
 
 

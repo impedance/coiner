@@ -12,23 +12,26 @@ export function useWeeklyReview(weekKey: string, periodStart: string, periodEnd:
         reserve_delta: 0,
         joy_delta: 0
     });
+    const [history, setHistory] = useState<WeeklyReview[]>([]);
     const [loading, setLoading] = useState(true);
 
     const refresh = useCallback(async () => {
         setLoading(true);
 
-        const [existing, allTxs, allCats] = await Promise.all([
+        const [existing, allTxs, allCats, allReviews] = await Promise.all([
             weeklyReviewRepository.getByWeek(weekKey),
             transactionRepository.getAll(),
-            categoryRepository.getAll()
+            categoryRepository.getAll(),
+            weeklyReviewRepository.getAll()
         ]);
 
         setReview(existing);
+        setHistory(allReviews.slice(0, 6).reverse()); // Show last 6 reviews in chronological order
 
         const periodTxs = allTxs.filter(tx =>
             tx.happened_at >= periodStart && tx.happened_at <= periodEnd
         );
-
+// ... existing logic for income, expense, reserve_delta, joy_delta ...
         const income = periodTxs
             .filter(tx => tx.type === 'income')
             .reduce((sum, tx) => sum + tx.amount_cents, 0);
@@ -37,7 +40,6 @@ export function useWeeklyReview(weekKey: string, periodStart: string, periodEnd:
             .filter(tx => tx.type === 'expense')
             .reduce((sum, tx) => sum + tx.amount_cents, 0);
             
-        // Calculate Reserve and Joy movements
         const reserveCat = allCats.find(c => c.bucket_type === 'reserve');
         const joyCat = allCats.find(c => c.bucket_type === 'joy');
         
@@ -74,6 +76,7 @@ export function useWeeklyReview(weekKey: string, periodStart: string, periodEnd:
     return {
         review,
         stats,
+        history,
         loading,
         saveReview,
         refresh

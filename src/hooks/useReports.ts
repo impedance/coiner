@@ -105,6 +105,7 @@ export function useReports() {
             title: activeCycle.title,
             progress: 0.65, // Placeholder - in a real repo we'd compute from practice_checkins
             daysLeft: Math.max(0, Math.ceil((new Date(activeCycle.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))),
+            streak: 3, // Placeholder for streak calculation
         };
     }, [cycles]);
 

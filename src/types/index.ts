@@ -91,6 +91,7 @@ export interface WeeklyReview {
     joy_delta_cents: number;
     reflection?: string;
     next_focus?: string;
+    celebrations?: string;
     created_at: string;
     updated_at: string;
 }
