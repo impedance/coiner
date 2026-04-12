@@ -5,6 +5,16 @@
 - Prefer offline-by-default verification; gate real external calls behind an explicit opt-in (e.g. `INTEGRATION=1`).
 - Support Expo/React Native testing conventions.
 
+## Harness Details
+- **Harness version:** 0.6
+- **Detected stacks:** TypeScript, Expo, React Native
+
+## Implementation Milestones
+1. **Milestone 1 — Foundation and Capture:** SQLite, accounts, categories, transactions, Today screen
+2. **Milestone 2 — Planning and Goals:** Buckets, goals, contributions, artifacts
+3. **Milestone 3 — Behavior Layer:** Cycles, practices, check-ins, streaks
+4. **Milestone 4 — Review, Reports, and Data Portability:** Weekly review, reports, export/import
+
 ## Default commands
 - `make smoke` — fastest verification loop (structural + lint + test)
 - `make agent-smoke` — optional black-box checks (if wired)

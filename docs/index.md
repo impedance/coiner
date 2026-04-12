@@ -3,9 +3,31 @@
 Use this file as the repo map for agents. Keep it short and specific.
 
 ## Start Here
-- **Product spec:** `RFC-001-financial-behavior-tracker-mvp.md`
+- **Technical spec:** `docs/RFC-001.md`
 - Testing rules: `docs/testing.md`
-- Harness plan (discovery): `docs/harness_plan.md`
+
+## Core Philosophy: "80% Psychology / 20% Mechanics"
+The app is based on the "Master of Money" course principles. While traditional finance tools focus on deep accounting and automation, Moneywork focuses on:
+- **Awareness**: Capturing every transaction manually to stay "awake" to money movement.
+- **Intentionality**: Giving every dollar a job (The Bucket System).
+- **Safety & Joy**: Prioritizing the Reserve (safety) and the Joy Fund (motivation) as first-class citizens.
+- **Integration**: Closing the loop through Weekly Reviews and Practice Cycles to turn actions into permanent habits.
+
+## The Behavioral OS (Core Loops)
+- **Daily Loop**: Capture transactions, assign jobs, and check-in on practices.
+- **Weekly Loop**: Fact check vs. plan, identify leaks, and adjust for next week.
+- **Monthly Loop**: Strategic planning and "Step-Up" evaluations.
+
+## Glossary of Terms
+| Term | Description |
+| :--- | :--- |
+| **Capture** | The act of manually recording a transaction. |
+| **Bucket** | A category with a specific "job" assigned to its balance. |
+| **Reserve** | A system bucket for security and emergency savings. |
+| **Joy Fund** | A system bucket for guilt-free spending on personal happiness. |
+| **Artifact** | A visual or text-based emotional reminder attached to a Goal. |
+| **Cycle** | A time-bound period (14-30 days) focused on habit reinforcement. |
+| **Weekly Review** | The ritual of reflecting on the past week and planning the next. |
 
 ## Fast Commands
 - `make smoke` — fastest verification loop (structural + tests)
@@ -24,10 +46,8 @@ Use this file as the repo map for agents. Keep it short and specific.
 - **Adapters (I/O):** `src/db/` (SQLite client, migrations, seeds)
 
 ## Documentation & Epics
-- **RFC-001:** `RFC-001-financial-behavior-tracker-mvp.md`
-- **Epic 1 (Core):** `docs/epics/EPIC-001-foundation-and-core.md`
-- **Epic 2 (Planning):** `docs/epics/EPIC-002-planning-and-review.md`
-- **Epic 3 (Behavior):** `docs/epics/EPIC-003-behavior-and-integration.md`
+- **Technical Spec:** `docs/RFC-001.md`
+- **History:** `docs/archive/epics/`
 
 ## Typing Surfaces
 - **Config boundary:** `src/types/` — domain entity types, transaction types, cycle types

@@ -19,7 +19,7 @@ System-of-record map: `docs/index.md`.
 - Wire existing tooling first; do not migrate the stack just to satisfy the harness.
 - Keep default verification offline and deterministic unless the repo documents an opt-in integration path.
 - Never commit secrets or generated credentials.
-- **RFC-first:** Implementation must follow `RFC-001-financial-behavior-tracker-mvp.md`.
+- **RFC-first:** Implementation must follow `docs/RFC-001.md`.
 - **Local-first:** No backend, auth, or network sync in MVP.
 - **TypeScript strict mode:** All code must compile in strict mode.
 
