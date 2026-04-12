@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDataSelection } from './useData';
-import { Transaction, Category, MonthlyBucketPlan, Goal, Cycle } from '../types';
+import { Transaction, Category, MonthlyBucketPlan, Goal, Cycle, Account } from '../types';
+import { calculateUnassignedMoney } from '../domain/calculators';
 
 export function useReports() {
     const { 
-        transactions, categories, plans, goals, cycles, isReady 
+        transactions, categories, plans, goals, cycles, accounts, isReady 
     } = useDataSelection();
     
     const [loading, setLoading] = useState(true);
@@ -110,8 +111,9 @@ export function useReports() {
     }, [cycles]);
 
     const nextAction = useMemo(() => {
-        const unassigned = transactions.reduce((sum, tx) => sum + (tx.type === 'income' ? tx.amount_cents : 0), 0) -
-            plans.filter(p => p.month_key === activeMonthKey).reduce((sum, p) => sum + p.assigned_cents, 0);
+        // Use the same formula as calculateUnassignedMoney in usePlanning
+        const totalOpening = accounts.reduce((sum, acc) => sum + acc.opening_balance_cents, 0);
+        const unassigned = calculateUnassignedMoney(totalOpening, transactions, plans);
 
         if (unassigned > 100) return { 
             title: 'Assign Income', 
@@ -142,7 +144,7 @@ export function useReports() {
             icon: 'camera-outline',
             route: '/transaction/new?type=expense'
         };
-    }, [transactions, plans, cycles, activeMonthKey]);
+    }, [transactions, plans, cycles, accounts]);
 
     const monthPace = useMemo(() => {
         const now = new Date();

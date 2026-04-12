@@ -51,11 +51,19 @@ const styles = StyleSheet.create({
     },
     fallbackEffect: {
         backgroundColor: Colors.card,
-        // Elevation for Android
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
+        ...Platform.select({
+            android: {
+                elevation: 4,
+            },
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.05,
+                shadowRadius: 12,
+            },
+            web: {
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+            },
+        }),
     },
 });

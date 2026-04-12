@@ -53,10 +53,15 @@ export function useDataSelection() {
 
     useEffect(() => {
         async function init() {
-            await migrate();
-            await seedSystemData();
-            await refresh();
-            setIsReady(true);
+            try {
+                await migrate();
+                await seedSystemData();
+                await refresh();
+            } catch (error) {
+                console.error('Failed to initialize data:', error);
+            } finally {
+                setIsReady(true);
+            }
         }
         init();
     }, [refresh]);

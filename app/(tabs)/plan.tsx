@@ -18,6 +18,17 @@ export default function PlanScreen() {
     const [editAmount, setEditAmount] = React.useState('');
     const [editType, setEditType] = React.useState<'planned' | 'assigned'>('planned');
 
+    // NOTE: useMemo must be before any conditional returns (React Hook Rules)
+    const categoriesByGroup = useMemo(() => {
+        const grouped: Record<string, Category[]> = {};
+        categories.forEach(cat => {
+            const groupId = cat.group_id || 'unprocessed';
+            if (!grouped[groupId]) grouped[groupId] = [];
+            grouped[groupId].push(cat);
+        });
+        return grouped;
+    }, [categories]);
+
     if (loading) {
         return (
             <View style={styles.centered}>
@@ -45,16 +56,6 @@ export default function PlanScreen() {
         setSelectedCategory(null);
         setEditAmount('');
     };
-
-    const categoriesByGroup = useMemo(() => {
-        const grouped: Record<string, Category[]> = {};
-        categories.forEach(cat => {
-            const groupId = cat.group_id || 'unprocessed';
-            if (!grouped[groupId]) grouped[groupId] = [];
-            grouped[groupId].push(cat);
-        });
-        return grouped;
-    }, [categories]);
 
     return (
         <View style={styles.container}>
