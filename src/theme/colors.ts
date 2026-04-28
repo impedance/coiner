@@ -17,13 +17,13 @@ export const Colors = {
     joy: 'hsla(330, 81%, 60%, 1)', // Joyful Pink
     
     // Neutrals
-    background: 'hsla(0, 0%, 97%, 1)', // Off-white
-    card: 'hsla(0, 0%, 100%, 0.8)', // Semi-transparent white
-    text: 'hsla(0, 0%, 10%, 1)', // Almost black
-    textSecondary: 'hsla(0, 0%, 50%, 1)', // Mid-gray
-    border: 'hsla(0, 0%, 90%, 1)',
+    background: 'hsla(222, 20%, 9%, 1)',      // deep navy-black
+    card: 'hsla(222, 20%, 14%, 0.95)',         // dark card surface
+    text: 'hsla(0, 0%, 94%, 1)',               // near-white
+    textSecondary: 'hsla(0, 0%, 55%, 1)',      // muted
+    border: 'hsla(222, 15%, 22%, 1)',
     
     // Glassmorphism Accents
-    glassBorder: 'hsla(0, 0%, 100%, 0.3)',
-    glassShadow: 'hsla(0, 0%, 0%, 0.05)',
+    glassBorder: 'hsla(0, 0%, 100%, 0.08)',
+    glassShadow: 'hsla(0, 0%, 0%, 0.3)',
 };

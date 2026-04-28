@@ -1,41 +1,84 @@
-import React, { useMemo, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useMemo, useCallback, useState } from 'react';
+import {
+    StyleSheet,
+    Text,
+    View,
+    ScrollView,
+    TouchableOpacity,
+    ActivityIndicator,
+} from 'react-native';
 import { useDataSelection } from '../../src/hooks/useData';
 import { usePlanning } from '../../src/hooks/usePlanning';
-import { useReports } from '../../src/hooks/useReports';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Theme, Colors, Typography } from '../../src/theme';
+import { Colors, Typography } from '../../src/theme';
 import { GlassCard } from '../../src/components/GlassCard';
 import { AnimatedProgressBar } from '../../src/components/AnimatedProgressBar';
+import { BucketSheet } from '../../src/components/BucketSheet';
+import { Category } from '../../src/types';
 
-export default function TodayScreen() {
+export default function BucketsScreen() {
     const { isReady: isDataReady, accounts, transactions } = useDataSelection();
 
-    // Get current month key (YYYY-MM)
     const monthKey = useMemo(() => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }, []);
 
-    const { unassignedMoney, loading: planningLoading } = usePlanning(monthKey);
-    const { 
-        reserveTrend, joyTrend, goalsSummary, cycleSummary, nextAction,
-        loading: reportsLoading 
-    } = useReports();
+    const { unassignedMoney, plans, categories, categoryGroups, loading: planningLoading, assignMoney, refresh } = usePlanning(monthKey);
 
-    const isReady = isDataReady && !planningLoading && !reportsLoading;
+    const isReady = isDataReady && !planningLoading;
+
+    // Bucket sheet state
+    const [sheetBucket, setSheetBucket] = useState<Category | null>(null);
+
+    const getSpentForCategory = useCallback(
+        (categoryId: string) =>
+            transactions
+                .filter(tx => tx.category_id === categoryId && tx.happened_at.startsWith(monthKey))
+                .reduce((sum, tx) => sum + tx.amount_cents, 0),
+        [transactions, monthKey]
+    );
+
+    const categoriesByGroup = useMemo(() => {
+        const grouped: Record<string, Category[]> = {};
+        categories.forEach(cat => {
+            const groupId = cat.group_id || 'unprocessed';
+            if (!grouped[groupId]) grouped[groupId] = [];
+            grouped[groupId].push(cat);
+        });
+        return grouped;
+    }, [categories]);
+
+    const totalBalance = useMemo(
+        () =>
+            accounts.reduce((sum, acc) => sum + acc.opening_balance_cents, 0) +
+            transactions.reduce(
+                (sum, tx) =>
+                    sum + (tx.type === 'income' ? tx.amount_cents : tx.type === 'expense' ? -tx.amount_cents : 0),
+                0
+            ),
+        [accounts, transactions]
+    );
 
     const handleActionPress = useCallback((route: string) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.push(route as any);
     }, []);
 
-    const handleSoftPress = useCallback((route: string) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push(route as any);
+    const monthLabel = useMemo(() => {
+        return new Date().toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
     }, []);
+
+    const formatCents = (cents: number) =>
+        (cents / 100).toLocaleString('ru-RU', { minimumFractionDigits: 0 }) + ' ₽';
+
+    const getProgressColor = (progress: number): string => {
+        if (progress < 0.7) return Colors.income;
+        if (progress <= 0.9) return Colors.reserve;
+        return Colors.expense;
+    };
 
     if (!isReady) {
         return (
@@ -45,222 +88,353 @@ export default function TodayScreen() {
         );
     }
 
-    const totalBalance = accounts.reduce((sum, acc) => sum + acc.opening_balance_cents, 0) +
-        transactions.reduce((sum, tx) => sum + (tx.type === 'income' ? tx.amount_cents : (tx.type === 'expense' ? -tx.amount_cents : 0)), 0);
+    const selectedPlan = sheetBucket ? plans.find(p => p.category_id === sheetBucket.id) ?? null : null;
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Today</Text>
-                <TouchableOpacity onPress={() => handleSoftPress('/settings')}>
-                    <Ionicons name="settings-outline" size={24} color={Colors.textSecondary} />
-                </TouchableOpacity>
-            </View>
-
-            <GlassCard style={styles.balanceCard}>
-                <Text style={styles.balanceLabel}>Total Balance</Text>
-                <Text style={styles.balanceAmount}>{(totalBalance / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</Text>
-
-                <View style={styles.unassignedRow}>
-                    <Text style={styles.unassignedLabel}>To be assigned:</Text>
-                    <Text style={[styles.unassignedAmount, { color: unassignedMoney > 0 ? Colors.income : Colors.textSecondary }]}>
-                        {(unassignedMoney / 100).toFixed(2)} €
-                    </Text>
-                </View>
-            </GlassCard>
-
-            {/* Next Action Hint */}
-            <TouchableOpacity 
-                style={styles.nextActionCard}
-                onPress={() => handleSoftPress(nextAction.route)}
+        <View style={styles.container}>
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.content}
+                showsVerticalScrollIndicator={false}
             >
-                <View style={styles.nextActionIcon}>
-                    <Ionicons name={nextAction.icon as any} size={24} color={Colors.primary} />
-                </View>
-                <View style={styles.nextActionInfo}>
-                    <Text style={styles.nextActionTitle}>{nextAction.title}</Text>
-                    <Text style={styles.nextActionDesc}>{nextAction.desc}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={Colors.border} />
-            </TouchableOpacity>
-
-            <View style={styles.actions}>
-                <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: Colors.expense }]}
-                    onPress={() => handleActionPress('/transaction/new?type=expense')}
-                >
-                    <Ionicons name="remove-circle" size={24} color="#FFFFFF" />
-                    <Text style={styles.actionButtonText}>Expense</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: Colors.income }]}
-                    onPress={() => handleActionPress('/transaction/new?type=income')}
-                >
-                    <Ionicons name="add-circle" size={24} color="#FFFFFF" />
-                    <Text style={styles.actionButtonText}>Income</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: Colors.primary }]}
-                    onPress={() => handleActionPress('/transaction/new?type=transfer')}
-                >
-                    <Ionicons name="swap-horizontal" size={24} color="#FFFFFF" />
-                    <Text style={styles.actionButtonText}>Transfer</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Progress Overview Section */}
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Progress Overview</Text>
-                
-                <View style={styles.statsGrid}>
-                    {/* Cycle & Streak */}
-                    <TouchableOpacity 
-                        style={styles.streakCardContainer}
-                        onPress={() => handleSoftPress('/behavior')}
-                    >
-                        <GlassCard style={styles.streakCard}>
-                            <View style={{ flex: 1 }}>
-                                <View style={styles.statHeader}>
-                                    <Ionicons name="flame" size={20} color="#FF5E00" />
-                                    <Text style={[styles.statLabel, { color: '#FF5E00', fontWeight: '800' }]}>Practice Streak</Text>
-                                </View>
-                                <Text style={[styles.statValue, { fontSize: 32 }]}>{(cycleSummary as any)?.streak || 0} Days</Text>
-                                <Text style={styles.smallLabel}>Keep it up! {cycleSummary?.daysLeft} days left in cycle.</Text>
-                            </View>
-                            <View style={styles.streakWheel}>
-                                <Ionicons name="ribbon" size={40} color="#FFCC00" />
-                            </View>
-                        </GlassCard>
+                {/* ── Header ── */}
+                <View style={styles.header}>
+                    <Text style={styles.monthLabel}>{monthLabel}</Text>
+                    <TouchableOpacity onPress={() => router.push('/settings' as any)}>
+                        <Ionicons name="settings-outline" size={22} color={Colors.textSecondary} />
                     </TouchableOpacity>
+                </View>
 
-                    {/* Reserve */}
-                    <GlassCard style={styles.statCard}>
-                        <View style={styles.statHeader}>
-                            <Ionicons name="shield-checkmark" size={16} color={Colors.reserve} />
-                            <Text style={styles.statLabel}>Reserve</Text>
-                        </View>
-                        <Text style={styles.statValue}>{(reserveTrend.current / 100).toFixed(0)}€</Text>
-                        <AnimatedProgressBar 
-                            progress={reserveTrend.target > 0 ? reserveTrend.current / reserveTrend.target : 0}
-                            color={Colors.reserve}
-                        />
+                {/* ── Balance Card (YNAB Header) ── */}
+                {unassignedMoney > 0 && (
+                    <GlassCard style={styles.readyToAssignCard} tint="dark" intensity={30}>
+                        <Text style={styles.readyToAssignLabel}>Ready to Assign</Text>
+                        <Text style={styles.readyToAssignAmount}>{formatCents(unassignedMoney)}</Text>
+                        <TouchableOpacity
+                            style={styles.assignButton}
+                            onPress={() => {/* Open auto-assign or similar */}}
+                        >
+                            <Text style={styles.assignButtonText}>Assign Money</Text>
+                        </TouchableOpacity>
                     </GlassCard>
-
-                    {/* Joy Fund */}
-                    <GlassCard style={styles.statCard}>
-                        <View style={styles.statHeader}>
-                            <Ionicons name="heart" size={16} color={Colors.joy} />
-                            <Text style={styles.statLabel}>Joy Fund</Text>
-                        </View>
-                        <Text style={styles.statValue}>{(joyTrend.current / 100).toFixed(0)}€</Text>
-                        <AnimatedProgressBar 
-                            progress={joyTrend.target > 0 ? joyTrend.current / joyTrend.target : 0}
-                            color={Colors.joy}
-                        />
-                    </GlassCard>
-                </View>
-            </View>
-
-            {/* Daily Practice Reminder if active cycle exists */}
-            {cycleSummary && (
-                <View style={styles.section}>
-                    <TouchableOpacity onPress={() => handleSoftPress('/behavior')}>
-                        <GlassCard style={styles.reminderCard}>
-                            <View style={styles.reminderIcon}>
-                                <Ionicons name="notifications" size={24} color="#FFF" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.reminderTitle}>Daily Awareness Check</Text>
-                                <Text style={styles.reminderDesc}>Don't forget to check in your practices today!</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-                        </GlassCard>
-                    </TouchableOpacity>
-                </View>
-            )}
-
-            <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Recent Activity</Text>
-                    <TouchableOpacity onPress={() => handleSoftPress('/report')}>
-                        <Text style={styles.seeAllText}>See Reports</Text>
-                    </TouchableOpacity>
-                </View>
-                {transactions.length === 0 ? (
-                    <Text style={styles.emptyText}>No transactions yet.</Text>
-                ) : (
-                    transactions.slice(0, 5).map(tx => (
-                        <View key={tx.id} style={styles.txItem}>
-                            <View style={styles.txInfo}>
-                                <Text style={styles.txNote}>{tx.note || 'Transaction'}</Text>
-                                <Text style={styles.txDate}>{new Date(tx.happened_at).toLocaleDateString()}</Text>
-                            </View>
-                            <Text style={[styles.txAmount, { color: tx.type === 'expense' ? Colors.expense : Colors.income }]}>
-                                {tx.type === 'expense' ? '-' : '+'}{(tx.amount_cents / 100).toFixed(2)} €
-                            </Text>
-                        </View>
-                    ))
                 )}
-            </View>
 
-            {accounts.length === 0 && (
-                <TouchableOpacity
-                    style={styles.setupButton}
-                    onPress={() => handleSoftPress('/settings')}
-                >
-                    <Ionicons name="warning-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                    <Text style={styles.setupButtonText}>Setup your first account</Text>
-                </TouchableOpacity>
-            )}
-        </ScrollView>
+                <View style={styles.secondaryBalanceRow}>
+                    <View>
+                        <Text style={styles.secondaryBalanceLabel}>Total Balance</Text>
+                        <Text style={styles.secondaryBalanceValue}>{formatCents(totalBalance)}</Text>
+                    </View>
+                    
+                    {/* ── Quick Actions (Small Icons) ── */}
+                    <View style={styles.miniActions}>
+                        <TouchableOpacity
+                            style={[styles.miniActionButton, { backgroundColor: Colors.expense }]}
+                            onPress={() => handleActionPress('/transaction/new?type=expense')}
+                        >
+                            <Ionicons name="remove" size={18} color="#FFFFFF" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.miniActionButton, { backgroundColor: Colors.income }]}
+                            onPress={() => handleActionPress('/transaction/new?type=income')}
+                        >
+                            <Ionicons name="add" size={18} color="#FFFFFF" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.miniActionButton, { backgroundColor: Colors.primary }]}
+                            onPress={() => handleActionPress('/transaction/new?type=transfer')}
+                        >
+                            <Ionicons name="swap-horizontal" size={18} color="#FFFFFF" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* ── Bucket Groups ── */}
+                {categoryGroups.map(group => {
+                    const groupCats = categoriesByGroup[group.id] || [];
+                    if (groupCats.length === 0) return null;
+
+                    return (
+                        <View key={group.id} style={styles.groupSection}>
+                            {/* Group Header */}
+                            <View style={styles.groupHeader}>
+                                <View style={styles.groupHeaderLine} />
+                                <Text style={styles.groupName}>{group.name}</Text>
+                                <View style={styles.groupHeaderLine} />
+                            </View>
+
+                            {/* Bucket Rows (YNAB Style) */}
+                            <View style={styles.bucketList}>
+                                {groupCats.map(cat => {
+                                    const plan = plans.find(p => p.category_id === cat.id);
+                                    const spent = getSpentForCategory(cat.id);
+                                    const assigned = plan?.assigned_cents ?? 0;
+                                    const available = assigned - spent;
+                                    const progress = assigned > 0 ? Math.min(1, spent / assigned) : 0;
+                                    
+                                    let availableColor = 'transparent';
+                                    let availableText = Colors.text;
+                                    if (available > 0) {
+                                        availableColor = 'hsla(142, 76%, 36%, 0.2)';
+                                        availableText = '#4ADE80';
+                                    } else if (available < 0) {
+                                        availableColor = 'hsla(0, 84%, 60%, 0.2)';
+                                        availableText = '#F87171';
+                                    }
+
+                                    return (
+                                        <TouchableOpacity
+                                            key={cat.id}
+                                            style={styles.bucketRow}
+                                            onPress={() => {
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                setSheetBucket(cat);
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={styles.bucketMainInfo}>
+                                                <Text style={styles.bucketNameShort} numberOfLines={1}>
+                                                    {cat.name}
+                                                </Text>
+                                            </View>
+
+                                            <View style={styles.bucketValues}>
+                                                <Text style={styles.valueText}>{formatCents(assigned)}</Text>
+                                                <Text style={styles.valueText}>{formatCents(spent)}</Text>
+                                                <View style={[styles.availablePill, { backgroundColor: availableColor }]}>
+                                                    <Text style={[styles.availableText, { color: availableText }]}>
+                                                        {formatCents(available)}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            
+                                            {/* Thin progress indicator at the bottom */}
+                                            <View style={styles.miniProgressContainer}>
+                                                <View 
+                                                    style={[
+                                                        styles.miniProgressBar, 
+                                                        { 
+                                                            width: `${progress * 100}%`,
+                                                            backgroundColor: available < 0 ? Colors.expense : Colors.primary
+                                                        }
+                                                    ]} 
+                                                />
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    );
+                })}
+
+                {/* Bottom padding */}
+                <View style={{ height: 32 }} />
+            </ScrollView>
+
+            {/* ── BucketSheet ── */}
+            <BucketSheet
+                visible={!!sheetBucket}
+                bucket={sheetBucket}
+                plan={selectedPlan}
+                allBuckets={categories}
+                allPlans={plans}
+                unassignedMoney={unassignedMoney}
+                onClose={() => setSheetBucket(null)}
+                onAssign={assignMoney}
+                refreshData={refresh}
+            />
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.background },
-    content: { padding: 20, paddingTop: 60, paddingBottom: 100 },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    headerTitle: { ...Typography.h1 },
-    balanceCard: { marginBottom: 24, padding: 24 },
-    balanceLabel: { ...Typography.label, marginBottom: 8 },
-    balanceAmount: { ...Typography.h1, fontSize: 40, marginBottom: 16 },
-    unassignedRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 16 },
-    unassignedLabel: { ...Typography.body, fontSize: 14, marginRight: 8 },
-    unassignedAmount: { ...Typography.bodyBold, fontSize: 14 },
-    nextActionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card, borderRadius: 24, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: Colors.glassBorder, gap: 12 },
-    nextActionIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'hsla(210, 100%, 95%, 1)', justifyContent: 'center', alignItems: 'center' },
-    nextActionInfo: { flex: 1 },
-    nextActionTitle: { ...Typography.bodyBold },
-    nextActionDesc: { ...Typography.small, marginTop: 2 },
-    actions: { flexDirection: 'row', gap: 12, marginBottom: 32 },
-    actionButton: { flex: 1, padding: 16, borderRadius: 20, alignItems: 'center', justifyContent: 'center', gap: 8, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
-    actionButtonText: { ...Typography.bodyBold, color: '#FFFFFF', fontSize: 14 },
-    section: { marginBottom: 32 },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    sectionTitle: { ...Typography.h2, marginBottom: 0 },
-    seeAllText: { ...Typography.bodyMedium, color: Colors.primary, fontSize: 14 },
-    statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    statCard: { width: '48%', padding: 16 },
-    streakCardContainer: { width: '100%', marginBottom: 4 },
-    streakCard: { padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    statHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-    statLabel: { ...Typography.label, fontSize: 10 },
-    statValue: { ...Typography.h3, marginBottom: 12 },
-    streakWheel: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255, 204, 0, 0.1)', justifyContent: 'center', alignItems: 'center' },
-    smallLabel: { ...Typography.small, fontSize: 10 },
-    reminderCard: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12, backgroundColor: 'hsla(210, 100%, 50%, 0.1)', borderColor: Colors.primary },
-    reminderIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
-    reminderTitle: { ...Typography.bodyBold, fontSize: 14 },
-    reminderDesc: { ...Typography.small, color: Colors.textSecondary },
-    txItem: { backgroundColor: Colors.card, padding: 16, borderRadius: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: Colors.glassBorder },
-    txInfo: { flex: 1 },
-    txNote: { ...Typography.bodyMedium },
-    txDate: { ...Typography.small },
-    txAmount: { ...Typography.bodyBold },
-    emptyText: { ...Typography.body, color: Colors.textSecondary, fontStyle: 'italic', textAlign: 'center', padding: 20 },
-    setupButton: { backgroundColor: Colors.primary, padding: 18, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
-    setupButtonText: { ...Typography.bodyBold, color: '#FFFFFF' },
+    container: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
+    scroll: {
+        flex: 1,
+    },
+    content: {
+        padding: 20,
+        paddingTop: 60,
+        paddingBottom: 40,
+    },
+    centered: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: Colors.background,
+    },
+
+    // Header
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    monthLabel: {
+        ...Typography.h2,
+        textTransform: 'capitalize',
+    },
+
+    // YNAB Header Styles
+    readyToAssignCard: {
+        padding: 20,
+        borderRadius: 24,
+        marginBottom: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'hsla(142, 76%, 36%, 0.3)',
+        backgroundColor: 'hsla(142, 76%, 36%, 0.05)',
+    },
+    readyToAssignLabel: {
+        ...Typography.small,
+        color: '#4ADE80',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 4,
+    },
+    readyToAssignAmount: {
+        ...Typography.h1,
+        fontSize: 42,
+        color: '#4ADE80',
+        marginBottom: 12,
+    },
+    assignButton: {
+        backgroundColor: 'hsla(142, 76%, 36%, 0.2)',
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'hsla(142, 76%, 36%, 0.4)',
+    },
+    assignButtonText: {
+        ...Typography.bodyBold,
+        color: '#4ADE80',
+        fontSize: 13,
+    },
+
+    secondaryBalanceRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
+        paddingHorizontal: 4,
+    },
+    secondaryBalanceLabel: {
+        ...Typography.small,
+        color: Colors.textSecondary,
+        marginBottom: 2,
+    },
+    secondaryBalanceValue: {
+        ...Typography.bodyBold,
+        fontSize: 16,
+    },
+
+    // Mini Actions
+    miniActions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    miniActionButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+    },
+
+    // Bucket List (YNAB Style)
+    bucketList: {
+        backgroundColor: Colors.card,
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    bucketRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+    },
+    bucketMainInfo: {
+        flex: 1,
+    },
+    bucketNameShort: {
+        ...Typography.bodyMedium,
+        fontSize: 15,
+        color: Colors.text,
+    },
+    bucketValues: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    valueText: {
+        ...Typography.small,
+        fontSize: 13,
+        color: Colors.textSecondary,
+        width: 60,
+        textAlign: 'right',
+    },
+    availablePill: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        minWidth: 75,
+        alignItems: 'center',
+    },
+    availableText: {
+        ...Typography.bodyBold,
+        fontSize: 13,
+    },
+    miniProgressContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 2,
+        backgroundColor: 'transparent',
+    },
+    miniProgressBar: {
+        height: '100%',
+        borderRadius: 1,
+    },
+
+    // Group
+    groupSection: {
+        marginBottom: 20,
+    },
+    groupHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 8,
+        paddingHorizontal: 4,
+    },
+    groupHeaderLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: Colors.border,
+        opacity: 0.5,
+    },
+    groupName: {
+        ...Typography.label,
+        fontSize: 10,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        color: Colors.textSecondary,
+    },
 });

@@ -107,6 +107,32 @@ export default function SettingsScreen() {
                         <Text style={styles.itemValueRight}>{getSetting('primary_currency', 'EUR')}</Text>
                         <Ionicons name="chevron-forward" size={16} color={Colors.border} />
                     </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={styles.listItem} 
+                        onPress={() => {
+                            Alert.alert(
+                                'Default Account',
+                                'Select an account to use as default for transactions.',
+                                [
+                                    ...accounts.map(acc => ({
+                                        text: acc.name,
+                                        onPress: () => updateSetting('default_account_id', acc.id)
+                                    })),
+                                    { text: 'None', onPress: () => updateSetting('default_account_id', '') },
+                                    { text: 'Cancel', style: 'cancel' } as const
+                                ]
+                            );
+                        }}
+                    >
+                        <Ionicons name="wallet-outline" size={20} color={Colors.income} />
+                        <Text style={styles.itemName}>Default Account</Text>
+                        <Text style={styles.itemValueRight}>
+                            {accounts.find(a => a.id === getSetting('default_account_id', ''))?.name || 'Not Set'}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={16} color={Colors.border} />
+                    </TouchableOpacity>
+
                     <TouchableOpacity style={[styles.listItem, { borderBottomWidth: 0 }]} onPress={() => router.push('/settings/practices' as any)}>
                         <Ionicons name="book-outline" size={20} color={Colors.secondary} />
                         <Text style={styles.itemName}>Practice Library</Text>

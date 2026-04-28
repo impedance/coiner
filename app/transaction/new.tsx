@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useDataSelection } from '../../src/hooks/useData';
+import { useSettings } from '../../src/hooks/useSettings';
 import { transactionRepository } from '../../src/db/repositories/TransactionRepository';
 
 type TransactionType = 'expense' | 'income' | 'transfer';
@@ -9,6 +10,7 @@ type TransactionType = 'expense' | 'income' | 'transfer';
 export default function NewTransactionScreen() {
     const { type: initialType } = useLocalSearchParams<{ type: TransactionType }>();
     const { accounts, categories, goals, moneySteps, isReady, refresh } = useDataSelection();
+    const { getSetting } = useSettings();
 
     const [type, setType] = useState<TransactionType>(initialType || 'expense');
     const [step, setStep] = useState(1);
@@ -19,6 +21,14 @@ export default function NewTransactionScreen() {
     const [note, setNote] = useState('');
     const [goalId, setGoalId] = useState<string | null>(null);
     const [moneyStepId, setMoneyStepId] = useState<string | null>(null);
+
+    const { settings, loading: settingsLoading } = useSettings();
+
+    useEffect(() => {
+        if (!accountId && !settingsLoading) {
+            setAccountId(getSetting('default_account_id', ''));
+        }
+    }, [settingsLoading, accountId, getSetting]);
 
     const filteredCategories = categories.filter(c => c.kind === type || (type === 'transfer' && c.kind === 'expense'));
 
@@ -70,7 +80,7 @@ export default function NewTransactionScreen() {
         }
     };
 
-    if (!isReady) return null;
+    if (!isReady || settingsLoading) return null;
 
     const getTitle = () => {
         switch (type) {
@@ -117,7 +127,10 @@ export default function NewTransactionScreen() {
                         onChangeText={setAmount}
                         autoFocus
                     />
-                    <TouchableOpacity style={styles.nextButton} onPress={() => setStep(2)}>
+                    <TouchableOpacity 
+                        style={styles.nextButton} 
+                        onPress={() => setStep(accountId ? (type === 'transfer' ? 3 : 4) : 2)}
+                    >
                         <Text style={styles.nextButtonText}>Next</Text>
                     </TouchableOpacity>
                 </View>

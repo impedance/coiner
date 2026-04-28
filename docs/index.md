@@ -40,9 +40,11 @@ The app is based on the "Master of Money" course principles. While traditional f
 - [/] **EPIC-003: Behavior & Integration** — 65% complete.
 
 ## Code Map
-- **Entrypoints:** `app/` (Expo Router screens), `src/db/repositories/`
-- **Core domain logic:** `src/domain/` (calculators, business rules, pure functions)
-- **Boundaries / DTOs / config:** `src/types/` (TypeScript types), `src/lib/` (utilities)
+- **Entrypoints:** `app/` (Expo Router screens)
+- **Data Access:** `src/db/repositories/` (repositories for each domain entity)
+- **Feature Logic:** `src/hooks/` (hooks connecting repositories to UI)
+- **Core domain logic:** `src/domain/` (pure calculators and business rules)
+- **Boundaries / DTOs / config:** `src/types/` (TypeScript types)
 - **Adapters (I/O):** `src/db/` (SQLite client, migrations, seeds)
 
 ## Documentation & Epics
@@ -77,14 +79,12 @@ src/
     seeds/                    # Seed data (categories, practices)
     repositories/             # Data access layer
   domain/
-    accounts/                 # Account business logic
-    categories/               # Category business logic
-    transactions/             # Transaction logic, calculators
-    plans/                    # Bucket planning logic
-    goals/                    # Goal logic, contributions
-    cycles/                   # Cycle and practice logic
-    reviews/                  # Weekly review logic
-    reports/                  # Report calculators
+    calculators.ts            # Shared calculation logic
+    __tests__/                # Domain logic tests
+  hooks/                      # Feature hooks (useGoals, useData, etc.)
+  components/                 # Reusable UI components
+  theme/                      # Design system (colors, typography)
+  types/                      # Domain and DTO types
   features/                   # Feature-specific hooks and view models
   components/                 # Reusable UI components
   lib/                        # Utilities
