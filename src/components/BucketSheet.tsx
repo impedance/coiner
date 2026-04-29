@@ -10,11 +10,12 @@ import {
     Platform,
     ScrollView,
 } from 'react-native';
-import { router } from 'expo-router';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import { Layout } from '../theme';
-import { Category, Transaction, MonthlyBucketPlan } from '../types';
+import { 
+    Category, 
+    MonthlyBucketPlan, 
+    Transaction,
+    Account
+} from '../types';
 import { getBucketAvailable, getBucketState } from '../domain/budget/calculators';
 import { useSettings } from '../hooks/useSettings';
 import { transactionRepository } from '../db/repositories/TransactionRepository';
@@ -22,6 +23,7 @@ import { categoryRepository } from '../db/repositories/CategoryRepository';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { NumberPad } from './NumberPad';
+import { Colors, Typography, Layout } from '../theme';
 
 interface BucketSheetProps {
     visible: boolean;
@@ -32,6 +34,8 @@ interface BucketSheetProps {
     unassignedMoney: number;
     transactions: Transaction[];
     monthKey: string;
+    accounts: Account[];
+    categoryGroups: any[];
     onClose: () => void;
     onAssign: (categoryId: string, amountCents: number) => Promise<void>;
     refreshData: () => Promise<void>;
@@ -48,6 +52,8 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
     unassignedMoney,
     transactions,
     monthKey,
+    accounts,
+    categoryGroups,
     onClose,
     onAssign,
     refreshData,
@@ -58,6 +64,7 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
     const [sourceId, setSourceId] = useState<string | null>(null);
     const [spendAmount, setSpendAmount] = useState('');
     const [spendNote, setSpendNote] = useState('');
+    const [spendAccountId, setSpendAccountId] = useState<string | null>(null);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [isEditingName, setIsEditingName] = useState(false);
@@ -68,6 +75,12 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
     }, [bucket]);
 
     const { getSetting } = useSettings();
+
+    React.useEffect(() => {
+        if (visible && accounts.length > 0 && !spendAccountId) {
+            setSpendAccountId(getSetting('default_account_id', accounts[0].id));
+        }
+    }, [visible, accounts, getSetting]);
 
     const currentAssigned = plan?.assigned_cents ?? 0;
 
@@ -82,7 +95,7 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
         .sort((a, b) => b.happened_at.localeCompare(a.happened_at));
 
     const formatCents = (cents: number) =>
-        (cents / 100).toLocaleString('ru-RU', { minimumFractionDigits: 0 }) + ' ₽';
+        (cents / 100).toLocaleString() + ' ₽';
 
     const handleAssign = async () => {
         setError('');
@@ -113,9 +126,8 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
             return;
         }
         
-        const defaultAccountId = getSetting('default_account_id', '');
-        if (!defaultAccountId) {
-            setError('Set a default account in Settings first');
+        if (!spendAccountId) {
+            setError('Select an account');
             return;
         }
 
@@ -124,7 +136,7 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
             await transactionRepository.create({
                 type: 'expense',
                 amount_cents: amountCents,
-                account_id: defaultAccountId,
+                account_id: spendAccountId,
                 category_id: bucket!.id,
                 note: spendNote || `Spend from ${bucket?.name}`,
                 happened_at: new Date().toISOString(),
@@ -174,6 +186,7 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
         setSpendAmount('');
         setSpendNote('');
         setSourceId(null);
+        setSpendAccountId(null);
         setActiveTab('spend');
         setIsEditingName(false);
         onClose();
@@ -186,7 +199,8 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
         }
         setSaving(true);
         try {
-            await categoryRepository.update(bucket!.id, { name: editedName });
+            const defaultGroup = categoryGroups.find(g => g.name === 'Variable') || categoryGroups[0];
+            await categoryRepository.update(bucket!.id, { name: editedName, group_id: defaultGroup?.id });
             await refreshData();
             setIsEditingName(false);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -213,10 +227,8 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                     style={styles.sheetWrapper}
                 >
                     <View style={styles.sheet}>
-                        {/* Handle */}
                         <View style={styles.handle} />
 
-                        {/* Title & Rename */}
                         <View style={styles.titleContainer}>
                             {isEditingName ? (
                                 <View style={styles.renameContainer}>
@@ -255,7 +267,6 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                             </Text>
                         </View>
 
-                        {/* Tabs */}
                         <View style={styles.tabs}>
                             <TouchableOpacity
                                 style={[styles.tab, activeTab === 'spend' && styles.tabActive]}
@@ -291,127 +302,139 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                             </TouchableOpacity>
                         </View>
 
-                        {/* Spend Tab */}
-                        {activeTab === 'spend' && (
-                            <View style={styles.tabContent}>
-                                <TextInput
-                                    style={styles.input}
-                                    showSoftInputOnFocus={false}
-                                    placeholder="0.00"
-                                    placeholderTextColor={Colors.textSecondary}
-                                    value={spendAmount}
-                                    onChangeText={text => { setSpendAmount(text); setError(''); }}
-                                    autoFocus
-                                />
-                                <TextInput
-                                    style={[styles.input, { fontSize: 16, padding: 12 }]}
-                                    placeholder="Note (optional)"
-                                    placeholderTextColor={Colors.textSecondary}
-                                    value={spendNote}
-                                    onChangeText={setSpendNote}
-                                />
-                                <NumberPad 
-                                    value={spendAmount} 
-                                    onChange={(val) => { setSpendAmount(val); setError(''); }} 
-                                />
-                                {error ? <Text style={styles.error}>{error}</Text> : null}
-                                <TouchableOpacity
-                                    style={[styles.primaryButton, { backgroundColor: Colors.expense }, saving && styles.disabled]}
-                                    onPress={handleSpend}
-                                    disabled={saving}
-                                >
-                                    <Text style={styles.primaryButtonText}>
-                                        {saving ? 'Recording…' : 'Record Expense'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-
-                        {/* Assign Tab */}
-                        {activeTab === 'assign' && (
-                            <View style={styles.tabContent}>
-                                <Text style={styles.hint}>
-                                    Нераспределено: {formatCents(unassignedMoney)}
-                                </Text>
-                                <TextInput
-                                    style={styles.input}
-                                    showSoftInputOnFocus={false}
-                                    placeholder={`Текущее: ${(currentAssigned / 100).toFixed(2)}`}
-                                    placeholderTextColor={Colors.textSecondary}
-                                    value={assignAmount}
-                                    onChangeText={text => { setAssignAmount(text); setError(''); }}
-                                    autoFocus
-                                />
-                                <NumberPad 
-                                    value={assignAmount} 
-                                    onChange={(val) => { setAssignAmount(val); setError(''); }} 
-                                />
-                                {error ? <Text style={styles.error}>{error}</Text> : null}
-                                <TouchableOpacity
-                                    style={[styles.primaryButton, saving && styles.disabled]}
-                                    onPress={handleAssign}
-                                    disabled={saving}
-                                >
-                                    <Text style={styles.primaryButtonText}>
-                                        {saving ? 'Сохраняю…' : 'Назначить'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                        {/* Move Tab */}
-                        {activeTab === 'move' && (
-                            <ScrollView style={styles.tabContent} keyboardShouldPersistTaps="handled">
-                                <Text style={styles.label}>From</Text>
-                                {bucketsWithFunds.length === 0 ? (
-                                    <Text style={styles.empty}>No buckets with available funds</Text>
-                                ) : (
-                                    bucketsWithFunds.map(b => {
-                                        const avail = getBucketAvailable(b.id, allPlans, transactions, monthKey);
-                                        return (
+                        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                            {activeTab === 'spend' && (
+                                <View style={styles.tabContent}>
+                                    <TextInput
+                                        style={styles.input}
+                                        showSoftInputOnFocus={false}
+                                        placeholder="0.00"
+                                        placeholderTextColor={Colors.textSecondary}
+                                        value={spendAmount}
+                                        onChangeText={text => { setSpendAmount(text); setError(''); }}
+                                        autoFocus
+                                    />
+                                    <TextInput
+                                        style={[styles.input, { fontSize: 16, padding: 12 }]}
+                                        placeholder="Note (optional)"
+                                        placeholderTextColor={Colors.textSecondary}
+                                        value={spendNote}
+                                        onChangeText={setSpendNote}
+                                    />
+                                    
+                                    <Text style={styles.label}>Account</Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accountChips}>
+                                        {accounts.map(acc => (
                                             <TouchableOpacity
-                                                key={b.id}
-                                                style={[styles.sourceRow, sourceId === b.id && styles.sourceRowActive]}
-                                                onPress={() => setSourceId(b.id)}
+                                                key={acc.id}
+                                                style={[styles.chip, spendAccountId === acc.id && styles.chipActive]}
+                                                onPress={() => setSpendAccountId(acc.id)}
                                             >
-                                                <Text style={styles.sourceRowText}>{b.name}</Text>
-                                                <Text style={styles.sourceRowAmount}>{formatCents(avail)}</Text>
+                                                <Text style={[styles.chipText, spendAccountId === acc.id && styles.chipTextActive]}>
+                                                    {acc.name}
+                                                </Text>
                                             </TouchableOpacity>
-                                        );
-                                    })
-                                )}
+                                        ))}
+                                    </ScrollView>
 
-                                <Text style={[styles.label, { marginTop: 16 }]}>To: {bucket.name}</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    showSoftInputOnFocus={false}
-                                    placeholder="Amount"
-                                    placeholderTextColor={Colors.textSecondary}
-                                    value={moveAmount}
-                                    onChangeText={text => { setMoveAmount(text); setError(''); }}
-                                />
-                                <NumberPad 
-                                    value={moveAmount} 
-                                    onChange={(val) => { setMoveAmount(val); setError(''); }} 
-                                />
-                                {error ? <Text style={styles.error}>{error}</Text> : null}
-                                <TouchableOpacity
-                                    style={[styles.primaryButton, saving && styles.disabled]}
-                                    onPress={handleMove}
-                                    disabled={saving}
-                                >
-                                    <Text style={styles.primaryButtonText}>
-                                        {saving ? 'Moving…' : 'Move Money'}
+                                    <NumberPad 
+                                        value={spendAmount} 
+                                        onChange={(val) => { setSpendAmount(val); setError(''); }} 
+                                    />
+                                    {error ? <Text style={styles.error}>{error}</Text> : null}
+                                    <TouchableOpacity
+                                        style={[styles.primaryButton, { backgroundColor: Colors.expense }, saving && styles.disabled]}
+                                        onPress={handleSpend}
+                                        disabled={saving}
+                                    >
+                                        <Text style={styles.primaryButtonText}>
+                                            {saving ? 'Recording…' : 'Record Expense'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+
+                            {activeTab === 'assign' && (
+                                <View style={styles.tabContent}>
+                                    <Text style={styles.hint}>
+                                        Unassigned: {formatCents(unassignedMoney)}
                                     </Text>
-                                </TouchableOpacity>
-                            </ScrollView>
-                        )}
+                                    <TextInput
+                                        style={styles.input}
+                                        showSoftInputOnFocus={false}
+                                        placeholder={`Current: ${(currentAssigned / 100).toFixed(2)}`}
+                                        placeholderTextColor={Colors.textSecondary}
+                                        value={assignAmount}
+                                        onChangeText={text => { setAssignAmount(text); setError(''); }}
+                                        autoFocus
+                                    />
+                                    <NumberPad 
+                                        value={assignAmount} 
+                                        onChange={(val) => { setAssignAmount(val); setError(''); }} 
+                                    />
+                                    {error ? <Text style={styles.error}>{error}</Text> : null}
+                                    <TouchableOpacity
+                                        style={[styles.primaryButton, saving && styles.disabled]}
+                                        onPress={handleAssign}
+                                        disabled={saving}
+                                    >
+                                        <Text style={styles.primaryButtonText}>
+                                            {saving ? 'Saving…' : 'Assign'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
 
-                        {/* History Tab */}
-                        {activeTab === 'transactions' && (
-                            <View style={styles.tabContent}>
-                                <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+                            {activeTab === 'move' && (
+                                <View style={styles.tabContent}>
+                                    <Text style={styles.label}>From</Text>
+                                    {bucketsWithFunds.length === 0 ? (
+                                        <Text style={styles.empty}>No buckets with available funds</Text>
+                                    ) : (
+                                        bucketsWithFunds.map(b => {
+                                            const avail = getBucketAvailable(b.id, allPlans, transactions, monthKey);
+                                            return (
+                                                <TouchableOpacity
+                                                    key={b.id}
+                                                    style={[styles.sourceRow, sourceId === b.id && styles.sourceRowActive]}
+                                                    onPress={() => setSourceId(b.id)}
+                                                >
+                                                    <Text style={styles.sourceRowText}>{b.name}</Text>
+                                                    <Text style={styles.sourceRowAmount}>{formatCents(avail)}</Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })
+                                    )}
+
+                                    <Text style={[styles.label, { marginTop: 16 }]}>To: {bucket.name}</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        showSoftInputOnFocus={false}
+                                        placeholder="Amount"
+                                        placeholderTextColor={Colors.textSecondary}
+                                        value={moveAmount}
+                                        onChangeText={text => { setMoveAmount(text); setError(''); }}
+                                    />
+                                    <NumberPad 
+                                        value={moveAmount} 
+                                        onChange={(val) => { setMoveAmount(val); setError(''); }} 
+                                    />
+                                    {error ? <Text style={styles.error}>{error}</Text> : null}
+                                    <TouchableOpacity
+                                        style={[styles.primaryButton, saving && styles.disabled]}
+                                        onPress={handleMove}
+                                        disabled={saving}
+                                    >
+                                        <Text style={styles.primaryButtonText}>
+                                            {saving ? 'Moving…' : 'Move Money'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {activeTab === 'transactions' && (
+                                <View style={styles.tabContent}>
                                     {bucketTransactions.length === 0 ? (
                                         <Text style={styles.empty}>No transactions for this bucket yet.</Text>
                                     ) : (
@@ -431,9 +454,9 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                                             </View>
                                         ))
                                     )}
-                                </ScrollView>
-                            </View>
-                        )}
+                                </View>
+                            )}
+                        </ScrollView>
                     </View>
                 </KeyboardAvoidingView>
             </View>
@@ -442,189 +465,43 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
 };
 
 const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-    },
-    sheetWrapper: {
-        justifyContent: 'flex-end',
-    },
-    sheet: {
-        backgroundColor: Colors.card,
-        borderRadius: 28,
-        paddingHorizontal: 24,
-        paddingBottom: 24,
-        paddingTop: 12,
-        borderWidth: 1,
-        borderColor: Colors.glassBorder,
-        maxHeight: '90%',
-        width: '92%',
-        maxWidth: 400,
-        alignSelf: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    handle: {
-        width: 40,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: Colors.border,
-        alignSelf: 'center',
-        marginBottom: 20,
-    },
-    titleContainer: {
-        marginBottom: 8,
-    },
-    titleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    renameContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    renameInput: {
-        ...Typography.h2,
-        flex: 1,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.primary,
-        paddingVertical: 4,
-    },
-    title: {
-        ...Typography.h2,
-    },
-    subtitle: {
-        ...Typography.small,
-    },
-    summaryRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-    },
-    tabs: {
-        flexDirection: 'row',
-        backgroundColor: 'hsla(222, 20%, 11%, 1)',
-        borderRadius: 14,
-        padding: 4,
-        marginBottom: 20,
-    },
-    tab: {
-        flex: 1,
-        paddingVertical: 10,
-        alignItems: 'center',
-        borderRadius: 11,
-    },
-    tabActive: {
-        backgroundColor: Colors.primary,
-    },
-    tabText: {
-        ...Typography.bodyMedium,
-        fontSize: 14,
-        color: Colors.textSecondary,
-    },
-    tabTextActive: {
-        color: '#FFFFFF',
-    },
-    tabContent: {
-        flexGrow: 0,
-    },
-    hint: {
-        ...Typography.small,
-        marginBottom: 12,
-    },
-    label: {
-        ...Typography.label,
-        marginBottom: 8,
-    },
-    input: {
-        backgroundColor: 'hsla(222, 20%, 11%, 1)',
-        borderRadius: 14,
-        padding: 16,
-        fontSize: 20,
-        color: Colors.text,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: Colors.border,
-    },
-    error: {
-        ...Typography.small,
-        color: Colors.expense,
-        marginBottom: 12,
-    },
-    primaryButton: {
-        backgroundColor: Colors.primary,
-        borderRadius: 16,
-        padding: 18,
-        alignItems: 'center',
-        marginTop: 4,
-    },
-    primaryButtonText: {
-        ...Typography.bodyBold,
-        color: '#FFFFFF',
-        fontSize: 16,
-    },
-    disabled: {
-        opacity: 0.5,
-    },
-    sourceRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 14,
-        borderRadius: 12,
-        backgroundColor: 'hsla(222, 20%, 11%, 1)',
-        marginBottom: 8,
-        borderWidth: 1,
-        borderColor: Colors.border,
-    },
-    sourceRowActive: {
-        borderColor: Colors.primary,
-        backgroundColor: 'hsla(210, 100%, 50%, 0.12)',
-    },
-    sourceRowText: {
-        ...Typography.bodyMedium,
-        fontSize: 15,
-    },
-    sourceRowAmount: {
-        ...Typography.bodyBold,
-        fontSize: 14,
-        color: Colors.textSecondary,
-    },
-    empty: {
-        ...Typography.small,
-        fontStyle: 'italic',
-        marginBottom: 12,
-    },
-    transactionRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-    },
-    transactionNote: {
-        ...Typography.bodyMedium,
-        fontSize: 14,
-        color: Colors.text,
-    },
-    transactionDate: {
-        ...Typography.small,
-        color: Colors.textSecondary,
-        fontSize: 12,
-    },
-    transactionAmount: {
-        ...Typography.bodyBold,
-        color: Colors.expense,
-        fontSize: 14,
-    },
+    overlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+    sheetWrapper: { justifyContent: 'flex-end', width: '100%', alignItems: 'center' },
+    sheet: { backgroundColor: Colors.card, borderRadius: 32, paddingHorizontal: 24, paddingBottom: 32, paddingTop: 12, borderWidth: 1, borderColor: Colors.glassBorder, maxHeight: '85%', width: '92%', maxWidth: 400, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10 },
+    handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: 20 },
+    titleContainer: { marginBottom: 8 },
+    titleRow: { flexDirection: 'row', alignItems: 'center' },
+    renameContainer: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    renameInput: { ...Typography.h2, flex: 1, borderBottomWidth: 1, borderBottomColor: Colors.primary, paddingVertical: 4, color: Colors.text },
+    title: { ...Typography.h2 },
+    subtitle: { ...Typography.small, color: Colors.textSecondary },
+    summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+    tabs: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 4, marginBottom: 20 },
+    tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12 },
+    tabActive: { backgroundColor: Colors.primary },
+    tabText: { ...Typography.bodyMedium, fontSize: 13, color: Colors.textSecondary },
+    tabTextActive: { color: '#FFFFFF', fontWeight: '800' },
+    tabContent: { paddingBottom: 20 },
+    hint: { ...Typography.small, marginBottom: 12, color: Colors.income },
+    label: { ...Typography.label, marginBottom: 8, color: Colors.textSecondary },
+    input: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 18, fontSize: 24, color: Colors.text, marginBottom: 12, borderWidth: 1, borderColor: Colors.glassBorder, textAlign: 'center' },
+    error: { ...Typography.small, color: Colors.expense, marginBottom: 12, textAlign: 'center' },
+    primaryButton: { backgroundColor: Colors.primary, borderRadius: 20, padding: 20, alignItems: 'center', marginTop: 10 },
+    primaryButtonText: { ...Typography.bodyBold, color: '#FFFFFF', fontSize: 16 },
+    disabled: { opacity: 0.5 },
+    sourceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.03)', marginBottom: 8, borderWidth: 1, borderColor: Colors.glassBorder },
+    sourceRowActive: { borderColor: Colors.primary, backgroundColor: 'hsla(210, 100%, 50%, 0.1)' },
+    sourceRowText: { ...Typography.bodyMedium, fontSize: 16 },
+    sourceRowAmount: { ...Typography.bodyBold, fontSize: 14, color: Colors.income },
+    empty: { ...Typography.small, fontStyle: 'italic', marginBottom: 12, textAlign: 'center', padding: 20 },
+    transactionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.glassBorder },
+    transactionNote: { ...Typography.bodyMedium, fontSize: 15, color: Colors.text },
+    transactionDate: { ...Typography.small, color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
+    transactionAmount: { ...Typography.bodyBold, color: Colors.expense, fontSize: 15 },
+    accountChips: { flexDirection: 'row', marginBottom: 20 },
+    chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 10, borderWidth: 1, borderColor: Colors.glassBorder },
+    chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    chipText: { ...Typography.small, color: Colors.textSecondary },
+    chipTextActive: { color: '#FFFFFF', fontWeight: '800' },
 });

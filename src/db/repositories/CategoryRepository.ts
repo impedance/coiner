@@ -11,20 +11,25 @@ export class CategoryRepository {
     async create(data: Partial<Category>): Promise<string> {
         const db = await getDatabase();
         const id = Crypto.randomUUID();
+        const now = new Date().toISOString();
         await db.runAsync(
-            'INSERT INTO categories (id, name, kind, group_id, sort_order, is_archived) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO categories (id, name, kind, group_id, bucket_type, sort_order, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             id,
             data.name || 'New Category',
             data.kind || 'expense',
             data.group_id || null,
+            data.bucket_type || 'expense',
             data.sort_order || 0,
-            0
+            0,
+            now,
+            now
         );
         return id;
     }
 
     async update(id: string, data: Partial<Category>): Promise<void> {
         const db = await getDatabase();
+        const now = new Date().toISOString();
         const fields: string[] = [];
         const values: any[] = [];
         
@@ -47,15 +52,16 @@ export class CategoryRepository {
 
         if (fields.length === 0) return;
 
+        fields.push('updated_at = ?');
+        values.push(now);
         values.push(id);
         await db.runAsync(`UPDATE categories SET ${fields.join(', ')} WHERE id = ?`, ...values);
     }
 
     async delete(id: string): Promise<void> {
         const db = await getDatabase();
-        // We could just archive, but the user said "delete". Let's archive for safety or check if it has transactions.
-        // For now, let's just archive to avoid breaking history.
-        await db.runAsync('UPDATE categories SET is_archived = 1 WHERE id = ?', id);
+        const now = new Date().toISOString();
+        await db.runAsync('UPDATE categories SET is_archived = 1, updated_at = ? WHERE id = ?', now, id);
     }
 }
 

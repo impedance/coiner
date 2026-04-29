@@ -9,6 +9,7 @@ import {
     Platform,
     Modal,
     TextInput,
+    Alert,
 } from 'react-native';
 import { useDataSelection } from '../../src/hooks/useData';
 import { usePlanning } from '../../src/hooks/usePlanning';
@@ -23,7 +24,6 @@ import { Category, Transaction, MonthlyBucketPlan } from '../../src/types';
 import { getBucketState, getBudgetSummary, getTotalAccountBalance } from '../../src/domain/budget/calculators';
 import { monthlyBucketPlanRepository } from '../../src/db/repositories/MonthlyBucketPlanRepository';
 import { categoryRepository } from '../../src/db/repositories/CategoryRepository';
-import { Alert } from 'react-native';
 
 export default function BucketsScreen() {
     const { isReady: isDataReady, accounts, transactions } = useDataSelection();
@@ -60,24 +60,14 @@ export default function BucketsScreen() {
     const [isAddingBucket, setIsAddingBucket] = useState(false);
     const [newBucketName, setNewBucketName] = useState('');
 
-    // Auto-open sheet if categoryId is provided (e.g. from overspending flow)
     useEffect(() => {
         if (autoOpenCategoryId && categories.length > 0) {
             const cat = categories.find(c => c.id === autoOpenCategoryId);
             if (cat) {
                 setSheetBucket(cat);
-                // Clear the param after opening? Router.setParams might work but replace is safer
             }
         }
     }, [autoOpenCategoryId, categories]);
-
-    const getSpentForCategory = useCallback(
-        (categoryId: string) =>
-            transactions
-                .filter(tx => tx.category_id === categoryId && tx.type === 'expense' && tx.happened_at.startsWith(monthKey))
-                .reduce((sum, tx) => sum + tx.amount_cents, 0),
-        [transactions, monthKey]
-    );
 
     const handleDeleteBucket = (cat: Category) => {
         Alert.alert(
@@ -98,19 +88,15 @@ export default function BucketsScreen() {
         );
     };
 
-    const handleAddBucket = async (groupId: string) => {
-        // We'll use the modal now
-        setIsAddingBucket(true);
-    };
-
     const confirmAddBucket = async () => {
         if (!newBucketName) {
             setIsAddingBucket(false);
             return;
         }
+        const defaultGroup = categoryGroups.find(g => g.name === 'Variable') || categoryGroups[0];
         await categoryRepository.create({ 
             name: newBucketName, 
-            group_id: categoryGroups[0]?.id || 'default', 
+            group_id: defaultGroup?.id, 
             kind: 'expense' 
         });
         setNewBucketName('');
@@ -140,17 +126,11 @@ export default function BucketsScreen() {
     }, []);
 
     const monthLabel = useMemo(() => {
-        return new Date().toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
+        return new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
     }, []);
 
     const formatCents = (cents: number) =>
-        (cents / 100).toLocaleString('ru-RU', { minimumFractionDigits: 0 }) + ' ₽';
-
-    const getProgressColor = (progress: number): string => {
-        if (progress < 0.7) return Colors.income;
-        if (progress <= 0.9) return Colors.reserve;
-        return Colors.expense;
-    };
+        (cents / 100).toLocaleString() + ' ₽';
 
     if (!isReady) {
         return (
@@ -169,7 +149,6 @@ export default function BucketsScreen() {
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
             >
-                {/* ── Header ── */}
                 <View style={styles.header}>
                     <Text style={styles.monthLabel}>{monthLabel}</Text>
                     <TouchableOpacity onPress={() => router.push('/settings' as any)}>
@@ -177,22 +156,19 @@ export default function BucketsScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* ── Carry Forward Prompt ── */}
                 {showCarryForward && (
                     <TouchableOpacity onPress={handleCarryForward} activeOpacity={0.8}>
                         <GlassCard style={styles.carryForwardCard}>
                             <Ionicons name="calendar-outline" size={24} color={Colors.primary} />
                             <View style={styles.carryForwardText}>
                                 <Text style={styles.carryForwardTitle}>Starting a new month?</Text>
-                                <Text style={styles.carryForwardSub}>Carry forward your plans from {new Date(new Date().setMonth(new Date().getMonth() - 1)).toLocaleString('ru-RU', { month: 'long' })}.</Text>
+                                <Text style={styles.carryForwardSub}>Carry forward your plans from previous month.</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
                         </GlassCard>
                     </TouchableOpacity>
                 )}
 
-
-                {/* ── Balance Card (YNAB Header) ── */}
                 <GlassCard 
                     style={[
                         styles.readyToAssignCard, 
@@ -229,7 +205,7 @@ export default function BucketsScreen() {
 
                         <TouchableOpacity 
                             style={styles.addBucketButton}
-                            onPress={() => handleAddBucket(categoryGroups[0]?.id || 'default')}
+                            onPress={() => setIsAddingBucket(true)}
                         >
                             <Ionicons name="add-circle-outline" size={18} color="#4ADE80" />
                             <Text style={styles.addBucketButtonText}>Add Bucket</Text>
@@ -242,8 +218,6 @@ export default function BucketsScreen() {
                         <Text style={styles.secondaryBalanceLabel}>Total Balance</Text>
                         <Text style={styles.secondaryBalanceValue}>{formatCents(totalBalance)}</Text>
                     </View>
-                    
-                    {/* ── Quick Actions (Small Icons) ── */}
                     <View style={styles.miniActions}>
                         <TouchableOpacity
                             style={[styles.miniActionButton, { backgroundColor: Colors.income }]}
@@ -251,14 +225,12 @@ export default function BucketsScreen() {
                         >
                             <Ionicons name="add" size={18} color="#FFFFFF" />
                         </TouchableOpacity>
-
                         <TouchableOpacity
                             style={[styles.miniActionButton, { backgroundColor: Colors.expense }]}
                             onPress={() => handleActionPress('/transaction/new?type=expense')}
                         >
                             <Ionicons name="remove" size={18} color="#FFFFFF" />
                         </TouchableOpacity>
-
                         <TouchableOpacity
                             style={[styles.miniActionButton, { backgroundColor: Colors.primary }]}
                             onPress={() => handleActionPress('/budget/assign')}
@@ -268,21 +240,18 @@ export default function BucketsScreen() {
                     </View>
                 </View>
 
-                {/* ── Bucket Groups ── */}
                 {categoryGroups.map(group => {
                     const groupCats = categoriesByGroup[group.id] || [];
                     if (groupCats.length === 0) return null;
 
                     return (
                         <View key={group.id} style={styles.groupSection}>
-                            {/* Group Header */}
                             <View style={styles.groupHeader}>
                                 <View style={styles.groupHeaderLine} />
                                 <Text style={styles.groupName}>{group.name}</Text>
                                 <View style={styles.groupHeaderLine} />
                             </View>
 
-                            {/* Bucket Rows (YNAB Style) */}
                             <View style={styles.bucketList}>
                                 {groupCats.map(cat => {
                                     const bucketState = getBucketState(cat.id, allPlans, transactions, monthKey);
@@ -292,10 +261,10 @@ export default function BucketsScreen() {
                                     let availableColor = 'transparent';
                                     let availableText = Colors.text;
                                     if (available > 0) {
-                                        availableColor = 'hsla(142, 76%, 36%, 0.2)';
+                                        availableColor = 'hsla(142, 76%, 36%, 0.15)';
                                         availableText = '#4ADE80';
                                     } else if (available < 0) {
-                                        availableColor = 'hsla(0, 84%, 60%, 0.2)';
+                                        availableColor = 'hsla(0, 84%, 60%, 0.15)';
                                         availableText = '#F87171';
                                     }
                                     return (
@@ -312,41 +281,18 @@ export default function BucketsScreen() {
                                                 <Text style={styles.bucketNameShort} numberOfLines={1}>
                                                     {cat.name}
                                                 </Text>
-                                                
-                                                {/* Action Icons */}
                                                 <View style={styles.bucketActions}>
-                                                    <TouchableOpacity 
-                                                        style={styles.bucketActionIcon}
-                                                        onPress={() => {
-                                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                            setSheetBucket(cat);
-                                                        }}
-                                                    >
-                                                        <Ionicons name="remove-circle-outline" size={18} color={Colors.expense} />
-                                                    </TouchableOpacity>
-                                                    
-                                                    <TouchableOpacity 
-                                                        style={styles.bucketActionIcon}
-                                                        onPress={() => {
-                                                            setSheetBucket(cat);
-                                                            // Maybe open directly to an "edit" mode if implemented
-                                                        }}
-                                                    >
-                                                        <Ionicons name="create-outline" size={18} color={Colors.textSecondary} />
-                                                    </TouchableOpacity>
-
                                                     <TouchableOpacity 
                                                         style={styles.bucketActionIcon}
                                                         onPress={() => handleDeleteBucket(cat)}
                                                     >
-                                                        <Ionicons name="trash-outline" size={18} color={Colors.textSecondary} />
+                                                        <Ionicons name="trash-outline" size={16} color={Colors.textSecondary} />
                                                     </TouchableOpacity>
                                                 </View>
                                             </View>
 
                                             <View style={styles.bucketValues}>
                                                 <Text style={styles.valueText}>{formatCents(assigned)}</Text>
-                                                <Text style={styles.valueText}>{formatCents(spent)}</Text>
                                                 <View style={[styles.availablePill, { backgroundColor: availableColor }]}>
                                                     <Text style={[styles.availableText, { color: availableText }]}>
                                                         {formatCents(available)}
@@ -354,7 +300,6 @@ export default function BucketsScreen() {
                                                 </View>
                                             </View>
                                             
-                                            {/* Thin progress indicator at the bottom */}
                                             <View style={styles.miniProgressContainer}>
                                                 <View 
                                                     style={[
@@ -373,12 +318,9 @@ export default function BucketsScreen() {
                         </View>
                     );
                 })}
-
-                {/* Bottom padding */}
-                <View style={{ height: 32 }} />
+                <View style={{ height: 40 }} />
             </ScrollView>
 
-            {/* ── Add Bucket Modal ── */}
             <Modal
                 visible={isAddingBucket}
                 transparent
@@ -409,7 +351,6 @@ export default function BucketsScreen() {
                 </View>
             </Modal>
 
-            {/* ── BucketSheet ── */}
             <BucketSheet
                 visible={!!sheetBucket}
                 bucket={sheetBucket}
@@ -419,6 +360,8 @@ export default function BucketsScreen() {
                 unassignedMoney={unassignedMoney}
                 transactions={transactions}
                 monthKey={monthKey}
+                accounts={accounts}
+                categoryGroups={categoryGroups}
                 onClose={() => setSheetBucket(null)}
                 onAssign={assignMoney}
                 refreshData={refresh}
@@ -428,327 +371,54 @@ export default function BucketsScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: Colors.background,
-    },
-    scroll: {
-        flex: 1,
-    },
-    content: {
-        padding: Layout.PADDING,
-        paddingTop: 60,
-        paddingBottom: 40,
-        width: '100%',
-        maxWidth: Layout.MAX_WIDTH,
-        alignSelf: 'center',
-    },
-    centered: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: Colors.background,
-    },
-
-    // Header
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    monthLabel: {
-        ...Typography.h2,
-        textTransform: 'capitalize',
-    },
-
-    // Carry Forward
-    carryForwardCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        marginBottom: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    carryForwardText: {
-        flex: 1,
-        marginLeft: 12,
-    },
-    carryForwardTitle: {
-        ...Typography.bodyBold,
-        color: Colors.primary,
-    },
-    carryForwardSub: {
-        ...Typography.small,
-        color: Colors.textSecondary,
-    },
-
-    // YNAB Header Styles
-    readyToAssignCard: {
-        padding: 20,
-        borderRadius: 24,
-        marginBottom: 16,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'hsla(142, 76%, 36%, 0.3)',
-        backgroundColor: 'hsla(142, 76%, 36%, 0.05)',
-    },
-    readyToAssignCardNegative: {
-        borderColor: 'hsla(0, 84%, 60%, 0.3)',
-        backgroundColor: 'hsla(0, 84%, 60%, 0.05)',
-    },
-    readyToAssignLabel: {
-        ...Typography.small,
-        color: '#4ADE80',
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-        marginBottom: 4,
-    },
-    readyToAssignAmount: {
-        ...Typography.h1,
-        fontSize: 42,
-        color: '#4ADE80',
-        marginBottom: 12,
-    },
-    readyToAssignActions: {
-        flexDirection: 'row',
-        gap: 12,
-        alignItems: 'center',
-    },
-    assignButton: {
-        backgroundColor: 'hsla(142, 76%, 36%, 0.2)',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'hsla(142, 76%, 36%, 0.4)',
-    },
-    addBucketButton: {
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    addBucketButtonText: {
-        ...Typography.bodyBold,
-        color: '#4ADE80',
-        fontSize: 13,
-    },
-    assignButtonText: {
-        ...Typography.bodyBold,
-        color: '#4ADE80',
-        fontSize: 13,
-    },
-
-    secondaryBalanceRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
-        paddingHorizontal: 4,
-    },
-    secondaryBalanceLabel: {
-        ...Typography.small,
-        color: Colors.textSecondary,
-        marginBottom: 2,
-    },
-    secondaryBalanceValue: {
-        ...Typography.bodyBold,
-        fontSize: 16,
-    },
-
-    // Mini Actions
-    miniActions: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    miniActionButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-    },
-
-    // Bucket List (YNAB Style)
-    bucketList: {
-        backgroundColor: Colors.card,
-        borderRadius: 16,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: Colors.border,
-    },
-    bucketRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-    },
-    bucketMainInfo: {
-        flex: 1,
-    },
-    bucketNameShort: {
-        ...Typography.bodyMedium,
-        fontSize: 15,
-        color: Colors.text,
-    },
-    bucketValues: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    valueText: {
-        ...Typography.small,
-        fontSize: 13,
-        color: Colors.textSecondary,
-        width: 60,
-        textAlign: 'right',
-    },
-    availablePill: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-        minWidth: 75,
-        alignItems: 'center',
-    },
-    availableText: {
-        ...Typography.bodyBold,
-        fontSize: 13,
-    },
-    miniProgressContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 2,
-        backgroundColor: 'transparent',
-    },
-    miniProgressBar: {
-        height: '100%',
-        borderRadius: 1,
-    },
-
-    // Group
-    groupSection: {
-        marginBottom: 20,
-    },
-    groupHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 8,
-        paddingHorizontal: 4,
-    },
-    groupHeaderLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: Colors.border,
-        opacity: 0.5,
-    },
-    groupName: {
-        ...Typography.label,
-        fontSize: 10,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        color: Colors.textSecondary,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    sectionTitle: {
-        ...Typography.label,
-        fontSize: 12,
-        color: Colors.textSecondary,
-    },
-    addBucketHeaderButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    addBucketHeaderText: {
-        ...Typography.small,
-        color: Colors.primary,
-        fontWeight: '600',
-    },
-    bucketActions: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: 4,
-    },
-    bucketActionIcon: {
-        padding: 4,
-        margin: -4,
-        opacity: 0.7,
-    },
-
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-    },
-    // Modal Styles
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalCard: {
-        width: '85%',
-        maxWidth: 340,
-        padding: 24,
-        borderRadius: 24,
-        backgroundColor: Colors.card,
-    },
-    modalTitle: {
-        ...Typography.h3,
-        marginBottom: 16,
-    },
-    modalInput: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 12,
-        padding: 14,
-        color: Colors.text,
-        fontSize: 16,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: Colors.border,
-    },
-    modalActions: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        gap: 12,
-    },
-    modalButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 10,
-    },
-    modalButtonPrimary: {
-        backgroundColor: Colors.primary,
-    },
-    modalButtonTextPrimary: {
-        ...Typography.bodyBold,
-        color: '#FFFFFF',
-    },
-    modalButtonTextSecondary: {
-        ...Typography.bodyMedium,
-        color: Colors.textSecondary,
-    },
+    container: { flex: 1, backgroundColor: Colors.background },
+    scroll: { flex: 1 },
+    content: { padding: 24, paddingTop: 60, paddingBottom: 40, width: '100%', maxWidth: Layout.MAX_WIDTH, alignSelf: 'center' },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+    monthLabel: { ...Typography.h2, textTransform: 'capitalize' },
+    carryForwardCard: { flexDirection: 'row', alignItems: 'center', padding: 18, marginBottom: 24, borderRadius: 24 },
+    carryForwardText: { flex: 1, marginLeft: 16 },
+    carryForwardTitle: { ...Typography.bodyBold, color: Colors.primary },
+    carryForwardSub: { ...Typography.small, color: Colors.textSecondary, marginTop: 2 },
+    readyToAssignCard: { padding: 24, borderRadius: 32, marginBottom: 24, alignItems: 'center' },
+    readyToAssignCardNegative: { borderColor: Colors.expense, backgroundColor: 'hsla(0, 84%, 60%, 0.05)' },
+    readyToAssignLabel: { ...Typography.label, color: '#4ADE80', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
+    readyToAssignAmount: { ...Typography.h1, fontSize: 44, color: '#4ADE80', marginBottom: 20 },
+    readyToAssignActions: { flexDirection: 'row', gap: 12 },
+    assignButton: { backgroundColor: 'hsla(142, 76%, 36%, 0.2)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: 'hsla(142, 76%, 36%, 0.4)' },
+    addBucketButton: { backgroundColor: 'rgba(255, 255, 255, 0.05)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: Colors.glassBorder, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    addBucketButtonText: { ...Typography.bodyBold, color: '#4ADE80', fontSize: 14 },
+    assignButtonText: { ...Typography.bodyBold, color: '#4ADE80', fontSize: 14 },
+    secondaryBalanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32, paddingHorizontal: 8 },
+    secondaryBalanceLabel: { ...Typography.label, color: Colors.textSecondary, marginBottom: 4 },
+    secondaryBalanceValue: { ...Typography.bodyBold, fontSize: 18 },
+    miniActions: { flexDirection: 'row', gap: 10 },
+    miniActionButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+    bucketList: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: Colors.glassBorder },
+    bucketRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: Colors.glassBorder },
+    bucketMainInfo: { flex: 1 },
+    bucketNameShort: { ...Typography.bodyBold, fontSize: 16, color: Colors.text },
+    bucketValues: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    valueText: { ...Typography.small, fontSize: 13, color: Colors.textSecondary, width: 60, textAlign: 'right' },
+    availablePill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, minWidth: 80, alignItems: 'center' },
+    availableText: { ...Typography.bodyBold, fontSize: 14 },
+    miniProgressContainer: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2 },
+    miniProgressBar: { height: '100%' },
+    groupSection: { marginBottom: 32 },
+    groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+    groupHeaderLine: { flex: 1, height: 1, backgroundColor: Colors.glassBorder },
+    groupName: { ...Typography.label, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: Colors.textSecondary },
+    bucketActions: { flexDirection: 'row', gap: 12, marginTop: 6 },
+    bucketActionIcon: { padding: 4, opacity: 0.6 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
+    backdrop: { ...StyleSheet.absoluteFillObject },
+    modalCard: { width: '85%', maxWidth: 340, padding: 28, borderRadius: 32 },
+    modalTitle: { ...Typography.h3, marginBottom: 20, textAlign: 'center' },
+    modalInput: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 18, color: Colors.text, fontSize: 16, marginBottom: 24, borderWidth: 1, borderColor: Colors.glassBorder },
+    modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
+    modalButton: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14 },
+    modalButtonPrimary: { backgroundColor: Colors.primary },
+    modalButtonTextPrimary: { ...Typography.bodyBold, color: '#FFFFFF' },
+    modalButtonTextSecondary: { ...Typography.bodyMedium, color: Colors.textSecondary },
 });

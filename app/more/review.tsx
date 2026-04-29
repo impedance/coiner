@@ -1,14 +1,19 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useWeeklyReview } from '../../src/hooks/useWeeklyReview';
+import { useSettings } from '../../src/hooks/useSettings';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography } from '../../src/theme';
+import { Colors, Typography, Layout } from '../../src/theme';
 import { GlassCard } from '../../src/components/GlassCard';
 import { SimpleBarChart } from '../../src/components/SimpleBarChart';
 import { CelebrationCard } from '../../src/components/CelebrationCard';
 import * as Haptics from 'expo-haptics';
 
 export default function ReviewScreen() {
+    const { getSetting } = useSettings();
+    const primaryCurrency = getSetting('primary_currency', 'RUB');
+    const currencySymbol = primaryCurrency === 'RUB' ? '₽' : (primaryCurrency === 'USD' ? '$' : '€');
+
     const { weekKey, periodStart, periodEnd } = useMemo(() => {
         const now = new Date();
         const start = new Date(now);
@@ -55,18 +60,17 @@ export default function ReviewScreen() {
 
     const handleSave = async () => {
         await saveReview({ reflection, next_focus: nextFocus, celebrations });
-        if (Platform.OS !== 'web') {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert('Success', 'Weekly review saved!');
     };
+
+    const formatAmount = (cents: number) => (cents / 100).toLocaleString() + ' ' + currencySymbol;
 
     const chartData = history.map(r => ({
         label: `W${r.week_key.split('-')[1]}`,
         value: r.reserve_delta_cents / 100
     }));
 
-    // Add current week to chart data if not already there
     if (!history.find(r => r.week_key === weekKey)) {
         chartData.push({
             label: `W${weekKey.split('-')[1]}`,
@@ -83,7 +87,7 @@ export default function ReviewScreen() {
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Weekly Review</Text>
-                    <Text style={styles.subtitle}>Week {weekKey.split('-')[1]}, {new Date(periodStart).toLocaleDateString()} - {new Date(periodEnd).toLocaleDateString()}</Text>
+                    <Text style={styles.subtitle}>Week {weekKey.split('-')[1]} • {new Date(periodStart).toLocaleDateString()} - {new Date(periodEnd).toLocaleDateString()}</Text>
                 </View>
 
                 {/* Main Stats Card */}
@@ -91,17 +95,17 @@ export default function ReviewScreen() {
                     <View style={styles.statRow}>
                         <View style={styles.statBox}>
                             <Text style={styles.statLabel}>Income</Text>
-                            <Text style={[styles.statValue, { color: Colors.income }]}>{(stats.income / 100).toFixed(2)} €</Text>
+                            <Text style={[styles.statValue, { color: Colors.income }]}>{formatAmount(stats.income)}</Text>
                         </View>
                         <View style={styles.statBox}>
                             <Text style={styles.statLabel}>Expenses</Text>
-                            <Text style={[styles.statValue, { color: Colors.expense }]}>{(stats.expense / 100).toFixed(2)} €</Text>
+                            <Text style={[styles.statValue, { color: Colors.expense }]}>{formatAmount(stats.expense)}</Text>
                         </View>
                     </View>
                     <View style={styles.netRow}>
-                        <Text style={styles.netLabel}>Net Cash Flow</Text>
+                        <Text style={styles.netLabel}>Net Flow</Text>
                         <Text style={[styles.netValue, { color: stats.income - stats.expense >= 0 ? Colors.income : Colors.expense }]}>
-                            {((stats.income - stats.expense) / 100).toFixed(2)} €
+                            {formatAmount(stats.income - stats.expense)}
                         </Text>
                     </View>
                 </GlassCard>
@@ -110,13 +114,13 @@ export default function ReviewScreen() {
                 <View style={styles.highlightsContainer}>
                     <GlassCard style={styles.highlightCard}>
                         <Ionicons name="shield-checkmark" size={20} color={Colors.reserve} style={{ marginBottom: 8 }} />
-                        <Text style={styles.highlightLabel}>Reserve Delta</Text>
-                        <Text style={styles.highlightValue}>{(stats.reserve_delta / 100).toFixed(2)} €</Text>
+                        <Text style={styles.highlightLabel}>Reserve</Text>
+                        <Text style={styles.highlightValue}>{formatAmount(stats.reserve_delta)}</Text>
                     </GlassCard>
                     <GlassCard style={styles.highlightCard}>
                         <Ionicons name="heart" size={20} color={Colors.joy} style={{ marginBottom: 8 }} />
-                        <Text style={styles.highlightLabel}>Joy Delta</Text>
-                        <Text style={styles.highlightValue}>{(stats.joy_delta / 100).toFixed(2)} €</Text>
+                        <Text style={styles.highlightLabel}>Joy</Text>
+                        <Text style={styles.highlightValue}>{formatAmount(stats.joy_delta)}</Text>
                     </GlassCard>
                 </View>
 
@@ -140,6 +144,7 @@ export default function ReviewScreen() {
                         multiline
                         numberOfLines={3}
                         placeholder="e.g., Avoided an impulse purchase, reached 50% of travel goal..."
+                        placeholderTextColor={Colors.textSecondary}
                         value={celebrations}
                         onChangeText={setCelebrations}
                     />
@@ -153,6 +158,7 @@ export default function ReviewScreen() {
                         multiline
                         numberOfLines={4}
                         placeholder="Write your deeper thoughts here..."
+                        placeholderTextColor={Colors.textSecondary}
                         value={reflection}
                         onChangeText={setReflection}
                     />
@@ -162,7 +168,8 @@ export default function ReviewScreen() {
                     <Text style={styles.sectionTitle}>Next Week's Focus</Text>
                     <TextInput
                         style={styles.input}
-                        placeholder="e.g., No dining out, save 50€ more..."
+                        placeholder="e.g., No dining out, save more..."
+                        placeholderTextColor={Colors.textSecondary}
                         value={nextFocus}
                         onChangeText={setNextFocus}
                     />
@@ -185,32 +192,32 @@ export default function ReviewScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
     scrollView: { flex: 1 },
-    content: { padding: 20, paddingBottom: 60 },
-    header: { marginBottom: 24, paddingTop: 60 },
-    title: { ...Typography.h1 },
-    subtitle: { ...Typography.small, color: Colors.textSecondary },
-    statsCard: { padding: 20, marginBottom: 20 },
-    statRow: { flexDirection: 'row', marginBottom: 20 },
+    content: { padding: 24, paddingBottom: 60, width: '100%', maxWidth: Layout.MAX_WIDTH, alignSelf: 'center' },
+    header: { marginBottom: 32, paddingTop: 60 },
+    title: { ...Typography.h1, fontSize: 36 },
+    subtitle: { ...Typography.body, color: Colors.textSecondary, marginTop: 4 },
+    statsCard: { padding: 24, marginBottom: 24, borderRadius: 28 },
+    statRow: { flexDirection: 'row', marginBottom: 24 },
     statBox: { flex: 1 },
-    statLabel: { ...Typography.label },
-    statValue: { ...Typography.h2 },
-    netRow: { borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    netLabel: { ...Typography.bodyBold },
-    netValue: { ...Typography.h2, fontSize: 24 },
-    highlightsContainer: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-    highlightCard: { flex: 1, padding: 16 },
-    highlightLabel: { ...Typography.small, fontSize: 10, textTransform: 'uppercase' },
-    highlightValue: { ...Typography.bodyBold, fontSize: 18 },
-    section: { marginBottom: 24 },
-    sectionTitle: { ...Typography.h3, marginBottom: 8 },
-    sectionDesc: { ...Typography.small, marginBottom: 12 },
-    chartCard: { padding: 12, paddingBottom: 24 },
-    textArea: { backgroundColor: Colors.card, borderRadius: 20, padding: 16, fontSize: 16, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: Colors.glassBorder, color: Colors.text },
-    input: { backgroundColor: Colors.card, borderRadius: 20, padding: 16, fontSize: 16, borderWidth: 1, borderColor: Colors.glassBorder, color: Colors.text },
-    saveButton: { backgroundColor: Colors.primary, padding: 18, borderRadius: 20, alignItems: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
-    saveButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-    completedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 20, gap: 8 },
-    completedText: { color: Colors.income, fontSize: 14, fontWeight: '600' },
+    statLabel: { ...Typography.label, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+    statValue: { ...Typography.h2, fontSize: 24 },
+    netRow: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    netLabel: { ...Typography.bodyBold, fontSize: 18 },
+    netValue: { ...Typography.h1, fontSize: 28 },
+    highlightsContainer: { flexDirection: 'row', gap: 16, marginBottom: 32 },
+    highlightCard: { flex: 1, padding: 20, borderRadius: 24 },
+    highlightLabel: { ...Typography.label, color: Colors.textSecondary, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
+    highlightValue: { ...Typography.bodyBold, fontSize: 18, marginTop: 4 },
+    section: { marginBottom: 32 },
+    sectionTitle: { ...Typography.h3, marginBottom: 12 },
+    sectionDesc: { ...Typography.body, color: Colors.textSecondary, marginBottom: 16, fontSize: 14 },
+    chartCard: { padding: 20, paddingBottom: 32, borderRadius: 28 },
+    textArea: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 24, padding: 20, fontSize: 16, minHeight: 120, textAlignVertical: 'top', borderWidth: 1, borderColor: Colors.glassBorder, color: Colors.text },
+    input: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 20, fontSize: 16, borderWidth: 1, borderColor: Colors.glassBorder, color: Colors.text },
+    saveButton: { backgroundColor: Colors.primary, padding: 20, borderRadius: 24, alignItems: 'center', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 8 },
+    saveButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
+    completedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 24, gap: 8 },
+    completedText: { color: Colors.income, fontSize: 14, fontWeight: '700' },
 });

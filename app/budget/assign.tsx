@@ -10,16 +10,20 @@ import {
     Platform,
 } from 'react-native';
 import { usePlanning } from '../../src/hooks/usePlanning';
+import { useSettings } from '../../src/hooks/useSettings';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Colors, Typography } from '../../src/theme';
+import { Colors, Typography, Layout } from '../../src/theme';
 import { GlassCard } from '../../src/components/GlassCard';
 
 export default function AssignScreen() {
     const now = new Date();
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const { unassignedMoney, plans, categories, categoryGroups, assignMoney, loading } = usePlanning(monthKey);
+    const { getSetting } = useSettings();
+    const primaryCurrency = getSetting('primary_currency', 'RUB');
+    const currencySymbol = primaryCurrency === 'RUB' ? '₽' : (primaryCurrency === 'USD' ? '$' : '€');
 
     // Local state for pending assignments
     const [assignments, setAssignments] = useState<Record<string, string>>({});
@@ -45,7 +49,7 @@ export default function AssignScreen() {
     };
 
     const formatCents = (cents: number) =>
-        (cents / 100).toLocaleString('ru-RU', { minimumFractionDigits: 0 }) + ' ₽';
+        (cents / 100).toLocaleString() + ' ' + currencySymbol;
 
     if (loading) return null;
 
@@ -74,7 +78,7 @@ export default function AssignScreen() {
                 </Text>
             </GlassCard>
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {categoryGroups.map(group => (
                     <View key={group.id} style={styles.groupSection}>
                         <Text style={styles.groupName}>{group.name}</Text>
@@ -83,7 +87,7 @@ export default function AssignScreen() {
                             const currentVal = assignments[cat.id] ?? (plan ? (plan.assigned_cents / 100).toString() : '0');
 
                             return (
-                                <View key={cat.id} style={styles.row}>
+                                <GlassCard key={cat.id} style={styles.row}>
                                     <Text style={styles.catName}>{cat.name}</Text>
                                     <View style={styles.inputWrapper}>
                                         <TextInput
@@ -94,9 +98,9 @@ export default function AssignScreen() {
                                             placeholder="0"
                                             placeholderTextColor={Colors.textSecondary}
                                         />
-                                        <Text style={styles.currency}>₽</Text>
+                                        <Text style={styles.currency}>{currencySymbol}</Text>
                                     </View>
-                                </View>
+                                </GlassCard>
                             );
                         })}
                     </View>
@@ -116,7 +120,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingTop: 60,
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         paddingBottom: 20,
     },
     backButton: {
@@ -135,71 +139,72 @@ const styles = StyleSheet.create({
         color: Colors.primary,
     },
     summaryCard: {
-        margin: 20,
-        padding: 20,
+        margin: 24,
+        padding: 24,
         alignItems: 'center',
-        borderRadius: 20,
+        borderRadius: 24,
     },
     summaryLabel: {
-        ...Typography.small,
+        ...Typography.label,
         color: Colors.textSecondary,
         textTransform: 'uppercase',
-        marginBottom: 4,
+        letterSpacing: 1,
+        marginBottom: 8,
     },
     summaryAmount: {
         ...Typography.h1,
-        fontSize: 32,
+        fontSize: 36,
     },
     scroll: {
         flex: 1,
     },
     content: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         paddingBottom: 40,
     },
     groupSection: {
-        marginBottom: 24,
+        marginBottom: 32,
     },
     groupName: {
         ...Typography.label,
-        color: Colors.textSecondary,
-        marginBottom: 12,
-        fontSize: 12,
+        color: Colors.primary,
+        marginBottom: 16,
         textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     row: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: Colors.card,
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 8,
-        borderWidth: 1,
-        borderColor: Colors.border,
+        padding: 18,
+        borderRadius: 20,
+        marginBottom: 12,
     },
     catName: {
-        ...Typography.bodyMedium,
+        ...Typography.bodyBold,
         color: Colors.text,
     },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 4,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: Colors.glassBorder,
     },
     input: {
         ...Typography.bodyBold,
         color: Colors.text,
         textAlign: 'right',
-        minWidth: 60,
+        minWidth: 80,
         padding: 0,
+        fontSize: 18,
     },
     currency: {
         ...Typography.body,
         color: Colors.textSecondary,
-        marginLeft: 4,
+        marginLeft: 8,
     },
 });
