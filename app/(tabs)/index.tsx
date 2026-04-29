@@ -6,19 +6,22 @@ import {
     ScrollView,
     TouchableOpacity,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import { useDataSelection } from '../../src/hooks/useData';
 import { usePlanning } from '../../src/hooks/usePlanning';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Colors, Typography } from '../../src/theme';
+import { Colors, Typography, Layout } from '../../src/theme';
 import { GlassCard } from '../../src/components/GlassCard';
 import { AnimatedProgressBar } from '../../src/components/AnimatedProgressBar';
 import { BucketSheet } from '../../src/components/BucketSheet';
 import { Category, Transaction, MonthlyBucketPlan } from '../../src/types';
 import { getBucketState, getBudgetSummary, getTotalAccountBalance } from '../../src/domain/budget/calculators';
 import { monthlyBucketPlanRepository } from '../../src/db/repositories/MonthlyBucketPlanRepository';
+import { categoryRepository } from '../../src/db/repositories/CategoryRepository';
+import { Alert } from 'react-native';
 
 export default function BucketsScreen() {
     const { isReady: isDataReady, accounts, transactions } = useDataSelection();
@@ -52,6 +55,8 @@ export default function BucketsScreen() {
 
     // Bucket sheet state
     const [sheetBucket, setSheetBucket] = useState<Category | null>(null);
+    const [isAddingBucket, setIsAddingBucket] = useState(false);
+    const [newBucketName, setNewBucketName] = useState('');
 
     // Auto-open sheet if categoryId is provided (e.g. from overspending flow)
     useEffect(() => {
@@ -71,6 +76,60 @@ export default function BucketsScreen() {
                 .reduce((sum, tx) => sum + tx.amount_cents, 0),
         [transactions, monthKey]
     );
+
+    const handleDeleteBucket = (cat: Category) => {
+        Alert.alert(
+            'Delete Bucket',
+            `Are you sure you want to delete "${cat.name}"? Historical data will be preserved but the bucket will no longer appear in your budget.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Delete', 
+                    style: 'destructive', 
+                    onPress: async () => {
+                        await categoryRepository.delete(cat.id);
+                        await refresh();
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    } 
+                }
+            ]
+        );
+    };
+
+    const handleAddBucket = async (groupId: string) => {
+        if (Platform.OS === 'ios') {
+            Alert.prompt(
+                'New Bucket',
+                'Enter the name for your new bucket:',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                        text: 'Create', 
+                        onPress: async (name?: string) => {
+                            if (!name) return;
+                            await categoryRepository.create({ name, group_id: groupId, kind: 'expense' });
+                            await refresh();
+                        } 
+                    }
+                ]
+            );
+        } else {
+            // Fallback for Web/Android
+            setIsAddingBucket(true);
+        }
+    };
+
+    const confirmAddBucket = async () => {
+        if (!newBucketName) return;
+        await categoryRepository.create({ 
+            name: newBucketName, 
+            group_id: categoryGroups[0]?.id || 'default', 
+            kind: 'expense' 
+        });
+        setNewBucketName('');
+        setIsAddingBucket(false);
+        await refresh();
+    };
 
     const categoriesByGroup = useMemo(() => {
         const grouped: Record<string, Category[]> = {};
@@ -144,6 +203,7 @@ export default function BucketsScreen() {
                     </TouchableOpacity>
                 )}
 
+
                 {/* ── Balance Card (YNAB Header) ── */}
                 <GlassCard 
                     style={[
@@ -165,18 +225,28 @@ export default function BucketsScreen() {
                     ]}>
                         {formatCents(unassignedMoney)}
                     </Text>
-                    <TouchableOpacity
-                        style={[
-                            styles.assignButton,
-                            unassignedMoney < 0 && { borderColor: Colors.expense }
-                        ]}
-                        onPress={() => handleActionPress('/budget/assign')}
-                    >
-                        <Text style={[
-                            styles.assignButtonText,
-                            unassignedMoney < 0 && { color: Colors.expense }
-                        ]}>Assign Money</Text>
-                    </TouchableOpacity>
+                    <View style={styles.readyToAssignActions}>
+                        <TouchableOpacity
+                            style={[
+                                styles.assignButton,
+                                unassignedMoney < 0 && { borderColor: Colors.expense }
+                            ]}
+                            onPress={() => handleActionPress('/budget/assign')}
+                        >
+                            <Text style={[
+                                styles.assignButtonText,
+                                unassignedMoney < 0 && { color: Colors.expense }
+                            ]}>Assign Money</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.addBucketButton}
+                            onPress={() => handleAddBucket(categoryGroups[0]?.id || 'default')}
+                        >
+                            <Ionicons name="add-circle-outline" size={18} color="#4ADE80" />
+                            <Text style={styles.addBucketButtonText}>Add Bucket</Text>
+                        </TouchableOpacity>
+                    </View>
                 </GlassCard>
 
                 <View style={styles.secondaryBalanceRow}>
@@ -240,7 +310,6 @@ export default function BucketsScreen() {
                                         availableColor = 'hsla(0, 84%, 60%, 0.2)';
                                         availableText = '#F87171';
                                     }
-
                                     return (
                                         <TouchableOpacity
                                             key={cat.id}
@@ -255,6 +324,36 @@ export default function BucketsScreen() {
                                                 <Text style={styles.bucketNameShort} numberOfLines={1}>
                                                     {cat.name}
                                                 </Text>
+                                                
+                                                {/* Action Icons */}
+                                                <View style={styles.bucketActions}>
+                                                    <TouchableOpacity 
+                                                        style={styles.bucketActionIcon}
+                                                        onPress={() => {
+                                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                            router.push(`/transaction/new?type=expense&categoryId=${cat.id}`);
+                                                        }}
+                                                    >
+                                                        <Ionicons name="remove-circle-outline" size={18} color={Colors.expense} />
+                                                    </TouchableOpacity>
+                                                    
+                                                    <TouchableOpacity 
+                                                        style={styles.bucketActionIcon}
+                                                        onPress={() => {
+                                                            setSheetBucket(cat);
+                                                            // Maybe open directly to an "edit" mode if implemented
+                                                        }}
+                                                    >
+                                                        <Ionicons name="create-outline" size={18} color={Colors.textSecondary} />
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity 
+                                                        style={styles.bucketActionIcon}
+                                                        onPress={() => handleDeleteBucket(cat)}
+                                                    >
+                                                        <Ionicons name="trash-outline" size={18} color={Colors.textSecondary} />
+                                                    </TouchableOpacity>
+                                                </View>
                                             </View>
 
                                             <View style={styles.bucketValues}>
@@ -318,9 +417,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     content: {
-        padding: 20,
+        padding: Layout.PADDING,
         paddingTop: 60,
         paddingBottom: 40,
+        width: '100%',
+        maxWidth: Layout.MAX_WIDTH,
+        alignSelf: 'center',
     },
     centered: {
         flex: 1,
@@ -391,13 +493,34 @@ const styles = StyleSheet.create({
         color: '#4ADE80',
         marginBottom: 12,
     },
+    readyToAssignActions: {
+        flexDirection: 'row',
+        gap: 12,
+        alignItems: 'center',
+    },
     assignButton: {
         backgroundColor: 'hsla(142, 76%, 36%, 0.2)',
         paddingHorizontal: 20,
-        paddingVertical: 8,
+        paddingVertical: 10,
         borderRadius: 20,
         borderWidth: 1,
         borderColor: 'hsla(142, 76%, 36%, 0.4)',
+    },
+    addBucketButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    addBucketButtonText: {
+        ...Typography.bodyBold,
+        color: '#4ADE80',
+        fontSize: 13,
     },
     assignButtonText: {
         ...Typography.bodyBold,
@@ -523,5 +646,36 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 0.5,
         color: Colors.textSecondary,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    sectionTitle: {
+        ...Typography.label,
+        fontSize: 12,
+        color: Colors.textSecondary,
+    },
+    addBucketHeaderButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    addBucketHeaderText: {
+        ...Typography.small,
+        color: Colors.primary,
+        fontWeight: '600',
+    },
+    bucketActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 4,
+    },
+    bucketActionIcon: {
+        padding: 4,
+        margin: -4,
+        opacity: 0.7,
     },
 });

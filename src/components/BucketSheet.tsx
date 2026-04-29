@@ -13,10 +13,14 @@ import {
 import { router } from 'expo-router';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
+import { Layout } from '../theme';
 import { Category, Transaction, MonthlyBucketPlan } from '../types';
 import { getBucketAvailable, getBucketState } from '../domain/budget/calculators';
 import { useSettings } from '../hooks/useSettings';
 import { transactionRepository } from '../db/repositories/TransactionRepository';
+import { categoryRepository } from '../db/repositories/CategoryRepository';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 interface BucketSheetProps {
     visible: boolean;
@@ -32,7 +36,7 @@ interface BucketSheetProps {
     refreshData: () => Promise<void>;
 }
 
-type Tab = 'spend' | 'assign' | 'move' | 'transactions';
+type Tab = 'assign' | 'move' | 'transactions';
 
 export const BucketSheet: React.FC<BucketSheetProps> = ({
     visible,
@@ -47,12 +51,18 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
     onAssign,
     refreshData,
 }) => {
-    const [activeTab, setActiveTab] = useState<Tab>('spend');
+    const [activeTab, setActiveTab] = useState<Tab>('assign');
     const [assignAmount, setAssignAmount] = useState('');
     const [moveAmount, setMoveAmount] = useState('');
     const [sourceId, setSourceId] = useState<string | null>(null);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editedName, setEditedName] = useState(bucket?.name || '');
+
+    React.useEffect(() => {
+        if (bucket) setEditedName(bucket.name);
+    }, [bucket]);
 
     const { getSetting } = useSettings();
 
@@ -125,8 +135,27 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
         setAssignAmount('');
         setMoveAmount('');
         setSourceId(null);
-        setActiveTab('spend');
+        setActiveTab('assign');
+        setIsEditingName(false);
         onClose();
+    };
+
+    const handleRename = async () => {
+        if (!editedName || editedName === bucket?.name) {
+            setIsEditingName(false);
+            return;
+        }
+        setSaving(true);
+        try {
+            await categoryRepository.update(bucket!.id, { name: editedName });
+            await refreshData();
+            setIsEditingName(false);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (e) {
+            setError('Failed to rename bucket');
+        } finally {
+            setSaving(false);
+        }
     };
 
     if (!bucket) return null;
@@ -148,8 +177,36 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                         {/* Handle */}
                         <View style={styles.handle} />
 
-                        {/* Title */}
-                        <Text style={styles.title}>{bucket.name}</Text>
+                        {/* Title & Rename */}
+                        <View style={styles.titleContainer}>
+                            {isEditingName ? (
+                                <View style={styles.renameContainer}>
+                                    <TextInput
+                                        style={styles.renameInput}
+                                        value={editedName}
+                                        onChangeText={setEditedName}
+                                        autoFocus
+                                        onBlur={handleRename}
+                                        onSubmitEditing={handleRename}
+                                    />
+                                    <TouchableOpacity onPress={handleRename}>
+                                        <Ionicons name="checkmark-circle" size={24} color={Colors.income} />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <TouchableOpacity 
+                                    style={styles.titleRow} 
+                                    onPress={() => {
+                                        setEditedName(bucket.name);
+                                        setIsEditingName(true);
+                                    }}
+                                >
+                                    <Text style={styles.title}>{bucket.name}</Text>
+                                    <Ionicons name="create-outline" size={18} color={Colors.textSecondary} style={{ marginLeft: 8 }} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
                         <View style={styles.summaryRow}>
                             <Text style={styles.subtitle}>
                                 Assigned: {formatCents(getBucketState(bucket.id, allPlans, transactions, monthKey).assignedCents)}
@@ -161,14 +218,6 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
 
                         {/* Tabs */}
                         <View style={styles.tabs}>
-                            <TouchableOpacity
-                                style={[styles.tab, activeTab === 'spend' && styles.tabActive]}
-                                onPress={() => setActiveTab('spend')}
-                            >
-                                <Text style={[styles.tabText, activeTab === 'spend' && styles.tabTextActive]}>
-                                    Spend
-                                </Text>
-                            </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.tab, activeTab === 'assign' && styles.tabActive]}
                                 onPress={() => setActiveTab('assign')}
@@ -195,23 +244,6 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                             </TouchableOpacity>
                         </View>
 
-                        {/* Spend Tab */}
-                        {activeTab === 'spend' && (
-                            <View style={styles.tabContent}>
-                                <Text style={styles.hint}>
-                                    Recording an expense will reduce the available balance in this bucket.
-                                </Text>
-                                <TouchableOpacity
-                                    style={styles.primaryButton}
-                                    onPress={() => {
-                                        onClose();
-                                        router.push(`/transaction/new?type=expense&categoryId=${bucket.id}`);
-                                    }}
-                                >
-                                    <Text style={styles.primaryButtonText}>Record Expense</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
 
                         {/* Assign Tab */}
                         {activeTab === 'assign' && (
@@ -341,6 +373,9 @@ const styles = StyleSheet.create({
         borderBottomWidth: 0,
         borderColor: Colors.glassBorder,
         maxHeight: '85%',
+        width: '100%',
+        maxWidth: Layout.MAX_WIDTH,
+        alignSelf: 'center',
     },
     handle: {
         width: 40,
@@ -350,9 +385,27 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
         marginBottom: 20,
     },
+    titleContainer: {
+        marginBottom: 8,
+    },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    renameContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    renameInput: {
+        ...Typography.h2,
+        flex: 1,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.primary,
+        paddingVertical: 4,
+    },
     title: {
         ...Typography.h2,
-        marginBottom: 4,
     },
     subtitle: {
         ...Typography.small,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useDataSelection } from '../../src/hooks/useData';
-import { Colors, Typography } from '../../src/theme';
+import { Colors, Typography, Layout } from '../../src/theme';
 import { GlassCard } from '../../src/components/GlassCard';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -75,9 +75,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: Layout.PADDING,
         paddingTop: 60,
         paddingBottom: 20,
+        width: '100%',
+        maxWidth: Layout.MAX_WIDTH,
+        alignSelf: 'center',
     },
     title: {
         ...Typography.h1,
@@ -94,8 +97,11 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     content: {
-        padding: 20,
+        padding: Layout.PADDING,
         paddingTop: 0,
+        width: '100%',
+        maxWidth: Layout.MAX_WIDTH,
+        alignSelf: 'center',
     },
     accountCard: {
         flexDirection: 'row',

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useDataSelection } from '../../src/hooks/useData';
 import { useSettings } from '../../src/hooks/useSettings';
 import { transactionRepository } from '../../src/db/repositories/TransactionRepository';
 import { getBucketAvailable } from '../../src/domain/budget/calculators';
-import { Colors } from '../../src/theme';
+import { Colors, Layout } from '../../src/theme';
 
 type TransactionType = 'expense' | 'income' | 'transfer';
 
@@ -98,6 +99,8 @@ export default function NewTransactionScreen() {
         }
     };
 
+    const skipToCategory = initialCategoryId && step === 1;
+
     if (!isReady || settingsLoading) return null;
 
     const getTitle = () => {
@@ -107,6 +110,27 @@ export default function NewTransactionScreen() {
             default: return 'Add Expense';
         }
     };
+
+    const renderAccountChips = () => (
+        <View style={styles.chipsContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+                {accounts.map(acc => (
+                    <TouchableOpacity
+                        key={acc.id}
+                        style={[styles.chip, accountId === acc.id && styles.chipActive]}
+                        onPress={() => {
+                            setAccountId(acc.id);
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                    >
+                        <Text style={[styles.chipText, accountId === acc.id && styles.chipTextActive]}>
+                            {acc.name}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+        </View>
+    );
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -137,6 +161,7 @@ export default function NewTransactionScreen() {
             {step === 1 && (
                 <View style={styles.step}>
                     <Text style={styles.label}>How much?</Text>
+                    {renderAccountChips()}
                     <TextInput
                         style={styles.input}
                         keyboardType="decimal-pad"
@@ -145,12 +170,22 @@ export default function NewTransactionScreen() {
                         onChangeText={setAmount}
                         autoFocus
                     />
-                    <TouchableOpacity 
-                        style={styles.nextButton} 
-                        onPress={() => setStep(accountId ? (type === 'transfer' ? 3 : 4) : 2)}
-                    >
-                        <Text style={styles.nextButtonText}>Next</Text>
-                    </TouchableOpacity>
+                    
+                    {initialCategoryId ? (
+                        <TouchableOpacity 
+                            style={styles.saveButton} 
+                            onPress={handleSave}
+                        >
+                            <Text style={styles.saveButtonText}>Save to {categories.find(c => c.id === categoryId)?.name}</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity 
+                            style={styles.nextButton} 
+                            onPress={() => setStep(accountId ? (type === 'transfer' ? 3 : 4) : 2)}
+                        >
+                            <Text style={styles.nextButtonText}>Next</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             )}
 
@@ -366,7 +401,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     content: {
-        padding: 24,
+        padding: Layout.PADDING,
+        width: '100%',
+        maxWidth: Layout.MAX_WIDTH,
+        alignSelf: 'center',
     },
     title: {
         fontSize: 28,
@@ -552,5 +590,33 @@ const styles = StyleSheet.create({
     transferLabel: {
         fontSize: 16,
         color: '#3A3A3C',
+    },
+    // Chips
+    chipsContainer: {
+        marginVertical: 8,
+    },
+    chipsScroll: {
+        gap: 8,
+        paddingRight: 24,
+    },
+    chip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#F2F2F7',
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    chipActive: {
+        backgroundColor: '#007AFF',
+        borderColor: '#007AFF',
+    },
+    chipText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#3A3A3C',
+    },
+    chipTextActive: {
+        color: '#FFFFFF',
     },
 });

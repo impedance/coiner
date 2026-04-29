@@ -7,7 +7,7 @@ import { useSettings } from '../../src/hooks/useSettings';
 import { useBehavior } from '../../src/hooks/useBehavior';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Colors, Typography } from '../../src/theme';
+import { Colors, Typography, Layout } from '../../src/theme';
 import { GlassCard } from '../../src/components/GlassCard';
 import * as Haptics from 'expo-haptics';
 
@@ -212,7 +212,13 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
-    content: { padding: 20, paddingTop: 60 },
+    content: { 
+        padding: Layout.PADDING, 
+        paddingTop: 60,
+        width: '100%',
+        maxWidth: Layout.MAX_WIDTH,
+        alignSelf: 'center',
+    },
     header: { marginBottom: 24 },
     title: { ...Typography.h1 },
     section: { marginBottom: 32 },
