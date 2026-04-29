@@ -21,6 +21,7 @@ import { transactionRepository } from '../db/repositories/TransactionRepository'
 import { categoryRepository } from '../db/repositories/CategoryRepository';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { NumberPad } from './NumberPad';
 
 interface BucketSheetProps {
     visible: boolean;
@@ -36,7 +37,7 @@ interface BucketSheetProps {
     refreshData: () => Promise<void>;
 }
 
-type Tab = 'assign' | 'move' | 'transactions';
+type Tab = 'spend' | 'assign' | 'move' | 'transactions';
 
 export const BucketSheet: React.FC<BucketSheetProps> = ({
     visible,
@@ -51,10 +52,12 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
     onAssign,
     refreshData,
 }) => {
-    const [activeTab, setActiveTab] = useState<Tab>('assign');
+    const [activeTab, setActiveTab] = useState<Tab>('spend');
     const [assignAmount, setAssignAmount] = useState('');
     const [moveAmount, setMoveAmount] = useState('');
     const [sourceId, setSourceId] = useState<string | null>(null);
+    const [spendAmount, setSpendAmount] = useState('');
+    const [spendNote, setSpendNote] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [isEditingName, setIsEditingName] = useState(false);
@@ -102,6 +105,40 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
         }
     };
 
+    const handleSpend = async () => {
+        setError('');
+        const amountCents = Math.round(parseFloat(spendAmount) * 100);
+        if (isNaN(amountCents) || amountCents <= 0) {
+            setError('Enter a valid amount');
+            return;
+        }
+        
+        const defaultAccountId = getSetting('default_account_id', '');
+        if (!defaultAccountId) {
+            setError('Set a default account in Settings first');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            await transactionRepository.create({
+                type: 'expense',
+                amount_cents: amountCents,
+                account_id: defaultAccountId,
+                category_id: bucket!.id,
+                note: spendNote || `Spend from ${bucket?.name}`,
+                happened_at: new Date().toISOString(),
+            });
+            await refreshData();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            handleClose();
+        } catch (e) {
+            setError('Failed to record expense');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleMove = async () => {
         setError('');
         if (!sourceId) {
@@ -134,8 +171,10 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
         setError('');
         setAssignAmount('');
         setMoveAmount('');
+        setSpendAmount('');
+        setSpendNote('');
         setSourceId(null);
-        setActiveTab('assign');
+        setActiveTab('spend');
         setIsEditingName(false);
         onClose();
     };
@@ -219,6 +258,14 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                         {/* Tabs */}
                         <View style={styles.tabs}>
                             <TouchableOpacity
+                                style={[styles.tab, activeTab === 'spend' && styles.tabActive]}
+                                onPress={() => setActiveTab('spend')}
+                            >
+                                <Text style={[styles.tabText, activeTab === 'spend' && styles.tabTextActive]}>
+                                    Spend
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
                                 style={[styles.tab, activeTab === 'assign' && styles.tabActive]}
                                 onPress={() => setActiveTab('assign')}
                             >
@@ -244,6 +291,42 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                             </TouchableOpacity>
                         </View>
 
+                        {/* Spend Tab */}
+                        {activeTab === 'spend' && (
+                            <View style={styles.tabContent}>
+                                <TextInput
+                                    style={styles.input}
+                                    showSoftInputOnFocus={false}
+                                    placeholder="0.00"
+                                    placeholderTextColor={Colors.textSecondary}
+                                    value={spendAmount}
+                                    onChangeText={text => { setSpendAmount(text); setError(''); }}
+                                    autoFocus
+                                />
+                                <TextInput
+                                    style={[styles.input, { fontSize: 16, padding: 12 }]}
+                                    placeholder="Note (optional)"
+                                    placeholderTextColor={Colors.textSecondary}
+                                    value={spendNote}
+                                    onChangeText={setSpendNote}
+                                />
+                                <NumberPad 
+                                    value={spendAmount} 
+                                    onChange={(val) => { setSpendAmount(val); setError(''); }} 
+                                />
+                                {error ? <Text style={styles.error}>{error}</Text> : null}
+                                <TouchableOpacity
+                                    style={[styles.primaryButton, { backgroundColor: Colors.expense }, saving && styles.disabled]}
+                                    onPress={handleSpend}
+                                    disabled={saving}
+                                >
+                                    <Text style={styles.primaryButtonText}>
+                                        {saving ? 'Recording…' : 'Record Expense'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
 
                         {/* Assign Tab */}
                         {activeTab === 'assign' && (
@@ -253,12 +336,16 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                                 </Text>
                                 <TextInput
                                     style={styles.input}
-                                    keyboardType="numeric"
+                                    showSoftInputOnFocus={false}
                                     placeholder={`Текущее: ${(currentAssigned / 100).toFixed(2)}`}
                                     placeholderTextColor={Colors.textSecondary}
                                     value={assignAmount}
                                     onChangeText={text => { setAssignAmount(text); setError(''); }}
                                     autoFocus
+                                />
+                                <NumberPad 
+                                    value={assignAmount} 
+                                    onChange={(val) => { setAssignAmount(val); setError(''); }} 
                                 />
                                 {error ? <Text style={styles.error}>{error}</Text> : null}
                                 <TouchableOpacity
@@ -298,11 +385,15 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                                 <Text style={[styles.label, { marginTop: 16 }]}>To: {bucket.name}</Text>
                                 <TextInput
                                     style={styles.input}
-                                    keyboardType="numeric"
+                                    showSoftInputOnFocus={false}
                                     placeholder="Amount"
                                     placeholderTextColor={Colors.textSecondary}
                                     value={moveAmount}
                                     onChangeText={text => { setMoveAmount(text); setError(''); }}
+                                />
+                                <NumberPad 
+                                    value={moveAmount} 
+                                    onChange={(val) => { setMoveAmount(val); setError(''); }} 
                                 />
                                 {error ? <Text style={styles.error}>{error}</Text> : null}
                                 <TouchableOpacity
@@ -353,7 +444,8 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        justifyContent: 'flex-end',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     backdrop: {
         ...StyleSheet.absoluteFillObject,
@@ -364,18 +456,21 @@ const styles = StyleSheet.create({
     },
     sheet: {
         backgroundColor: Colors.card,
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
+        borderRadius: 28,
         paddingHorizontal: 24,
-        paddingBottom: 40,
+        paddingBottom: 24,
         paddingTop: 12,
         borderWidth: 1,
-        borderBottomWidth: 0,
         borderColor: Colors.glassBorder,
-        maxHeight: '85%',
-        width: '100%',
-        maxWidth: Layout.MAX_WIDTH,
+        maxHeight: '90%',
+        width: '92%',
+        maxWidth: 400,
         alignSelf: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
     },
     handle: {
         width: 40,
@@ -533,4 +628,3 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
 });
-

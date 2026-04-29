@@ -7,6 +7,8 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Platform,
+    Modal,
+    TextInput,
 } from 'react-native';
 import { useDataSelection } from '../../src/hooks/useData';
 import { usePlanning } from '../../src/hooks/usePlanning';
@@ -97,30 +99,15 @@ export default function BucketsScreen() {
     };
 
     const handleAddBucket = async (groupId: string) => {
-        if (Platform.OS === 'ios') {
-            Alert.prompt(
-                'New Bucket',
-                'Enter the name for your new bucket:',
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                        text: 'Create', 
-                        onPress: async (name?: string) => {
-                            if (!name) return;
-                            await categoryRepository.create({ name, group_id: groupId, kind: 'expense' });
-                            await refresh();
-                        } 
-                    }
-                ]
-            );
-        } else {
-            // Fallback for Web/Android
-            setIsAddingBucket(true);
-        }
+        // We'll use the modal now
+        setIsAddingBucket(true);
     };
 
     const confirmAddBucket = async () => {
-        if (!newBucketName) return;
+        if (!newBucketName) {
+            setIsAddingBucket(false);
+            return;
+        }
         await categoryRepository.create({ 
             name: newBucketName, 
             group_id: categoryGroups[0]?.id || 'default', 
@@ -129,6 +116,7 @@ export default function BucketsScreen() {
         setNewBucketName('');
         setIsAddingBucket(false);
         await refresh();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     };
 
     const categoriesByGroup = useMemo(() => {
@@ -331,7 +319,7 @@ export default function BucketsScreen() {
                                                         style={styles.bucketActionIcon}
                                                         onPress={() => {
                                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                            router.push(`/transaction/new?type=expense&categoryId=${cat.id}`);
+                                                            setSheetBucket(cat);
                                                         }}
                                                     >
                                                         <Ionicons name="remove-circle-outline" size={18} color={Colors.expense} />
@@ -389,6 +377,37 @@ export default function BucketsScreen() {
                 {/* Bottom padding */}
                 <View style={{ height: 32 }} />
             </ScrollView>
+
+            {/* ── Add Bucket Modal ── */}
+            <Modal
+                visible={isAddingBucket}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setIsAddingBucket(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <TouchableOpacity style={styles.backdrop} onPress={() => setIsAddingBucket(false)} />
+                    <GlassCard style={styles.modalCard}>
+                        <Text style={styles.modalTitle}>New Bucket</Text>
+                        <TextInput
+                            style={styles.modalInput}
+                            placeholder="Bucket name..."
+                            placeholderTextColor={Colors.textSecondary}
+                            value={newBucketName}
+                            onChangeText={setNewBucketName}
+                            autoFocus
+                        />
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity style={styles.modalButton} onPress={() => setIsAddingBucket(false)}>
+                                <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.modalButton, styles.modalButtonPrimary]} onPress={confirmAddBucket}>
+                                <Text style={styles.modalButtonTextPrimary}>Create</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </GlassCard>
+                </View>
+            </Modal>
 
             {/* ── BucketSheet ── */}
             <BucketSheet
@@ -677,5 +696,59 @@ const styles = StyleSheet.create({
         padding: 4,
         margin: -4,
         opacity: 0.7,
+    },
+
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+    },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalCard: {
+        width: '85%',
+        maxWidth: 340,
+        padding: 24,
+        borderRadius: 24,
+        backgroundColor: Colors.card,
+    },
+    modalTitle: {
+        ...Typography.h3,
+        marginBottom: 16,
+    },
+    modalInput: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 12,
+        padding: 14,
+        color: Colors.text,
+        fontSize: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 12,
+    },
+    modalButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 10,
+    },
+    modalButtonPrimary: {
+        backgroundColor: Colors.primary,
+    },
+    modalButtonTextPrimary: {
+        ...Typography.bodyBold,
+        color: '#FFFFFF',
+    },
+    modalButtonTextSecondary: {
+        ...Typography.bodyMedium,
+        color: Colors.textSecondary,
     },
 });

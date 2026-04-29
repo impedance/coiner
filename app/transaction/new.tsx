@@ -7,6 +7,7 @@ import { useSettings } from '../../src/hooks/useSettings';
 import { transactionRepository } from '../../src/db/repositories/TransactionRepository';
 import { getBucketAvailable } from '../../src/domain/budget/calculators';
 import { Colors, Layout } from '../../src/theme';
+import { NumberPad } from '../../src/components/NumberPad';
 
 type TransactionType = 'expense' | 'income' | 'transfer';
 
@@ -164,12 +165,13 @@ export default function NewTransactionScreen() {
                     {renderAccountChips()}
                     <TextInput
                         style={styles.input}
-                        keyboardType="decimal-pad"
+                        showSoftInputOnFocus={false}
                         placeholder="0.00"
                         value={amount}
                         onChangeText={setAmount}
                         autoFocus
                     />
+                    <NumberPad value={amount} onChange={setAmount} />
                     
                     {initialCategoryId ? (
                         <TouchableOpacity 
