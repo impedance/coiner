@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -9,34 +9,65 @@ import {
 } from 'react-native';
 import { useDataSelection } from '../../src/hooks/useData';
 import { usePlanning } from '../../src/hooks/usePlanning';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors, Typography } from '../../src/theme';
 import { GlassCard } from '../../src/components/GlassCard';
 import { AnimatedProgressBar } from '../../src/components/AnimatedProgressBar';
 import { BucketSheet } from '../../src/components/BucketSheet';
-import { Category } from '../../src/types';
+import { Category, Transaction, MonthlyBucketPlan } from '../../src/types';
+import { getBucketState, getBudgetSummary, getTotalAccountBalance } from '../../src/domain/budget/calculators';
+import { monthlyBucketPlanRepository } from '../../src/db/repositories/MonthlyBucketPlanRepository';
 
 export default function BucketsScreen() {
     const { isReady: isDataReady, accounts, transactions } = useDataSelection();
+    const { categoryId: autoOpenCategoryId } = useLocalSearchParams<{ categoryId: string }>();
 
     const monthKey = useMemo(() => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }, []);
 
-    const { unassignedMoney, plans, categories, categoryGroups, loading: planningLoading, assignMoney, refresh } = usePlanning(monthKey);
+    const { unassignedMoney, plans, allPlans, categories, categoryGroups, loading: planningLoading, assignMoney, refresh } = usePlanning(monthKey);
+
+    const prevMonthKey = useMemo(() => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }, []);
+
+    const showCarryForward = useMemo(() => {
+        if (plans.length > 0) return false;
+        return allPlans.some(p => p.month_key === prevMonthKey);
+    }, [plans, allPlans, prevMonthKey]);
+
+    const handleCarryForward = async () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await monthlyBucketPlanRepository.carryForward(prevMonthKey, monthKey);
+        await refresh();
+    };
 
     const isReady = isDataReady && !planningLoading;
 
     // Bucket sheet state
     const [sheetBucket, setSheetBucket] = useState<Category | null>(null);
 
+    // Auto-open sheet if categoryId is provided (e.g. from overspending flow)
+    useEffect(() => {
+        if (autoOpenCategoryId && categories.length > 0) {
+            const cat = categories.find(c => c.id === autoOpenCategoryId);
+            if (cat) {
+                setSheetBucket(cat);
+                // Clear the param after opening? Router.setParams might work but replace is safer
+            }
+        }
+    }, [autoOpenCategoryId, categories]);
+
     const getSpentForCategory = useCallback(
         (categoryId: string) =>
             transactions
-                .filter(tx => tx.category_id === categoryId && tx.happened_at.startsWith(monthKey))
+                .filter(tx => tx.category_id === categoryId && tx.type === 'expense' && tx.happened_at.startsWith(monthKey))
                 .reduce((sum, tx) => sum + tx.amount_cents, 0),
         [transactions, monthKey]
     );
@@ -52,13 +83,7 @@ export default function BucketsScreen() {
     }, [categories]);
 
     const totalBalance = useMemo(
-        () =>
-            accounts.reduce((sum, acc) => sum + acc.opening_balance_cents, 0) +
-            transactions.reduce(
-                (sum, tx) =>
-                    sum + (tx.type === 'income' ? tx.amount_cents : tx.type === 'expense' ? -tx.amount_cents : 0),
-                0
-            ),
+        () => getTotalAccountBalance(accounts, transactions),
         [accounts, transactions]
     );
 
@@ -105,19 +130,54 @@ export default function BucketsScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* ── Balance Card (YNAB Header) ── */}
-                {unassignedMoney > 0 && (
-                    <GlassCard style={styles.readyToAssignCard} tint="dark" intensity={30}>
-                        <Text style={styles.readyToAssignLabel}>Ready to Assign</Text>
-                        <Text style={styles.readyToAssignAmount}>{formatCents(unassignedMoney)}</Text>
-                        <TouchableOpacity
-                            style={styles.assignButton}
-                            onPress={() => {/* Open auto-assign or similar */}}
-                        >
-                            <Text style={styles.assignButtonText}>Assign Money</Text>
-                        </TouchableOpacity>
-                    </GlassCard>
+                {/* ── Carry Forward Prompt ── */}
+                {showCarryForward && (
+                    <TouchableOpacity onPress={handleCarryForward} activeOpacity={0.8}>
+                        <GlassCard style={styles.carryForwardCard}>
+                            <Ionicons name="calendar-outline" size={24} color={Colors.primary} />
+                            <View style={styles.carryForwardText}>
+                                <Text style={styles.carryForwardTitle}>Starting a new month?</Text>
+                                <Text style={styles.carryForwardSub}>Carry forward your plans from {new Date(new Date().setMonth(new Date().getMonth() - 1)).toLocaleString('ru-RU', { month: 'long' })}.</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+                        </GlassCard>
+                    </TouchableOpacity>
                 )}
+
+                {/* ── Balance Card (YNAB Header) ── */}
+                <GlassCard 
+                    style={[
+                        styles.readyToAssignCard, 
+                        unassignedMoney < 0 && styles.readyToAssignCardNegative
+                    ]} 
+                    tint="dark" 
+                    intensity={30}
+                >
+                    <Text style={[
+                        styles.readyToAssignLabel,
+                        unassignedMoney < 0 && { color: Colors.expense }
+                    ]}>
+                        {unassignedMoney < 0 ? 'Overassigned' : 'Ready to Assign'}
+                    </Text>
+                    <Text style={[
+                        styles.readyToAssignAmount,
+                        unassignedMoney < 0 && { color: Colors.expense }
+                    ]}>
+                        {formatCents(unassignedMoney)}
+                    </Text>
+                    <TouchableOpacity
+                        style={[
+                            styles.assignButton,
+                            unassignedMoney < 0 && { borderColor: Colors.expense }
+                        ]}
+                        onPress={() => handleActionPress('/budget/assign')}
+                    >
+                        <Text style={[
+                            styles.assignButtonText,
+                            unassignedMoney < 0 && { color: Colors.expense }
+                        ]}>Assign Money</Text>
+                    </TouchableOpacity>
+                </GlassCard>
 
                 <View style={styles.secondaryBalanceRow}>
                     <View>
@@ -128,13 +188,6 @@ export default function BucketsScreen() {
                     {/* ── Quick Actions (Small Icons) ── */}
                     <View style={styles.miniActions}>
                         <TouchableOpacity
-                            style={[styles.miniActionButton, { backgroundColor: Colors.expense }]}
-                            onPress={() => handleActionPress('/transaction/new?type=expense')}
-                        >
-                            <Ionicons name="remove" size={18} color="#FFFFFF" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
                             style={[styles.miniActionButton, { backgroundColor: Colors.income }]}
                             onPress={() => handleActionPress('/transaction/new?type=income')}
                         >
@@ -142,10 +195,17 @@ export default function BucketsScreen() {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.miniActionButton, { backgroundColor: Colors.primary }]}
-                            onPress={() => handleActionPress('/transaction/new?type=transfer')}
+                            style={[styles.miniActionButton, { backgroundColor: Colors.expense }]}
+                            onPress={() => handleActionPress('/transaction/new?type=expense')}
                         >
-                            <Ionicons name="swap-horizontal" size={18} color="#FFFFFF" />
+                            <Ionicons name="remove" size={18} color="#FFFFFF" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.miniActionButton, { backgroundColor: Colors.primary }]}
+                            onPress={() => handleActionPress('/budget/assign')}
+                        >
+                            <Ionicons name="pie-chart" size={18} color="#FFFFFF" />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -167,10 +227,8 @@ export default function BucketsScreen() {
                             {/* Bucket Rows (YNAB Style) */}
                             <View style={styles.bucketList}>
                                 {groupCats.map(cat => {
-                                    const plan = plans.find(p => p.category_id === cat.id);
-                                    const spent = getSpentForCategory(cat.id);
-                                    const assigned = plan?.assigned_cents ?? 0;
-                                    const available = assigned - spent;
+                                    const bucketState = getBucketState(cat.id, allPlans, transactions, monthKey);
+                                    const { assignedCents: assigned, spentCents: spent, availableCents: available } = bucketState;
                                     const progress = assigned > 0 ? Math.min(1, spent / assigned) : 0;
                                     
                                     let availableColor = 'transparent';
@@ -239,8 +297,10 @@ export default function BucketsScreen() {
                 bucket={sheetBucket}
                 plan={selectedPlan}
                 allBuckets={categories}
-                allPlans={plans}
+                allPlans={allPlans}
                 unassignedMoney={unassignedMoney}
+                transactions={transactions}
+                monthKey={monthKey}
                 onClose={() => setSheetBucket(null)}
                 onAssign={assignMoney}
                 refreshData={refresh}
@@ -281,6 +341,29 @@ const styles = StyleSheet.create({
         textTransform: 'capitalize',
     },
 
+    // Carry Forward
+    carryForwardCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        marginBottom: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    carryForwardText: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    carryForwardTitle: {
+        ...Typography.bodyBold,
+        color: Colors.primary,
+    },
+    carryForwardSub: {
+        ...Typography.small,
+        color: Colors.textSecondary,
+    },
+
     // YNAB Header Styles
     readyToAssignCard: {
         padding: 20,
@@ -290,6 +373,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'hsla(142, 76%, 36%, 0.3)',
         backgroundColor: 'hsla(142, 76%, 36%, 0.05)',
+    },
+    readyToAssignCardNegative: {
+        borderColor: 'hsla(0, 84%, 60%, 0.3)',
+        backgroundColor: 'hsla(0, 84%, 60%, 0.05)',
     },
     readyToAssignLabel: {
         ...Typography.small,

@@ -133,10 +133,40 @@ export default function SettingsScreen() {
                         <Ionicons name="chevron-forward" size={16} color={Colors.border} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={[styles.listItem, { borderBottomWidth: 0 }]} onPress={() => router.push('/settings/practices' as any)}>
+                    <TouchableOpacity style={[styles.listItem, { borderBottomWidth: 0 }]} onPress={() => router.push('/more/practices' as any)}>
                         <Ionicons name="book-outline" size={20} color={Colors.secondary} />
                         <Text style={styles.itemName}>Practice Library</Text>
                         <Text style={styles.itemValueRight}>{definitions.length} items</Text>
+                        <Ionicons name="chevron-forward" size={16} color={Colors.border} />
+                    </TouchableOpacity>
+                </GlassCard>
+            </View>
+
+            {/* Advanced & Psychology Section */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Psychology & Growth</Text>
+                <GlassCard style={{ padding: 0 }}>
+                    <TouchableOpacity style={styles.listItem} onPress={() => router.push('/more/goals' as any)}>
+                        <Ionicons name="trophy-outline" size={20} color={Colors.primary} />
+                        <Text style={styles.itemName}>Financial Goals</Text>
+                        <Ionicons name="chevron-forward" size={16} color={Colors.border} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.listItem} onPress={() => router.push('/more/behavior' as any)}>
+                        <Ionicons name="fitness-outline" size={20} color={Colors.secondary} />
+                        <Text style={styles.itemName}>Behavior Tracking</Text>
+                        <Ionicons name="chevron-forward" size={16} color={Colors.border} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.listItem} onPress={() => router.push('/more/review' as any)}>
+                        <Ionicons name="checkmark-circle-outline" size={20} color={Colors.income} />
+                        <Text style={styles.itemName}>Weekly Review</Text>
+                        <Ionicons name="chevron-forward" size={16} color={Colors.border} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.listItem, { borderBottomWidth: 0 }]} onPress={() => router.push('/more/money-steps' as any)}>
+                        <Ionicons name="list-outline" size={20} color={Colors.reserve} />
+                        <Text style={styles.itemName}>Money Steps</Text>
                         <Ionicons name="chevron-forward" size={16} color={Colors.border} />
                     </TouchableOpacity>
                 </GlassCard>

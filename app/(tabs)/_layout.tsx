@@ -18,29 +18,29 @@ export default function TabsLayout() {
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: 'Buckets',
+                    title: 'Budget',
+                    tabBarIcon: ({ color }) => <Ionicons name="pie-chart" size={24} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="transactions"
+                options={{
+                    title: 'Transactions',
+                    tabBarIcon: ({ color }) => <Ionicons name="list" size={24} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="accounts"
+                options={{
+                    title: 'Accounts',
                     tabBarIcon: ({ color }) => <Ionicons name="wallet" size={24} color={color} />,
                 }}
             />
             <Tabs.Screen
-                name="goals"
+                name="settings"
                 options={{
-                    title: 'Goals',
-                    tabBarIcon: ({ color }) => <Ionicons name="trophy" size={24} color={color} />,
-                }}
-            />
-            <Tabs.Screen
-                name="review"
-                options={{
-                    title: 'Review',
-                    tabBarIcon: ({ color }) => <Ionicons name="checkmark-circle" size={24} color={color} />,
-                }}
-            />
-            <Tabs.Screen
-                name="behavior"
-                options={{
-                    title: 'Behavior',
-                    tabBarIcon: ({ color }) => <Ionicons name="fitness" size={24} color={color} />,
+                    title: 'Settings',
+                    tabBarIcon: ({ color }) => <Ionicons name="settings" size={24} color={color} />,
                 }}
             />
         </Tabs>

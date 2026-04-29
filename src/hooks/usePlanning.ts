@@ -5,10 +5,11 @@ import { categoryGroupRepository } from '../db/repositories/CategoryGroupReposit
 import { transactionRepository } from '../db/repositories/TransactionRepository';
 import { accountRepository } from '../db/repositories/AccountRepository';
 import { MonthlyBucketPlan, Category, CategoryGroup, Transaction, Account } from '../types';
-import { calculateUnassignedMoney } from '../domain/calculators';
+import { getReadyToAssign } from '../domain/budget/calculators';
 
 export function usePlanning(monthKey: string) {
     const [plans, setPlans] = useState<MonthlyBucketPlan[]>([]);
+    const [allPlans, setAllPlans] = useState<MonthlyBucketPlan[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
     const [unassignedMoney, setUnassignedMoney] = useState(0);
@@ -16,27 +17,22 @@ export function usePlanning(monthKey: string) {
 
     const refresh = useCallback(async () => {
         setLoading(true);
-        const [allPlans, allCats, allGroups, allTxs, allAccs] = await Promise.all([
+        const [monthlyPlans, fetchedAllPlans, allCats, allGroups, allTxs, allAccs] = await Promise.all([
             monthlyBucketPlanRepository.getByMonth(monthKey),
+            monthlyBucketPlanRepository.getAll(),
             categoryRepository.getAll(),
             categoryGroupRepository.getAll(),
             transactionRepository.getAll(),
             accountRepository.getAll(),
         ]);
 
-        setPlans(allPlans);
+        setPlans(monthlyPlans);
+        setAllPlans(fetchedAllPlans);
         setCategories(allCats);
         setCategoryGroups(allGroups);
 
-        // Calculate Total Money (Lifetime)
         const totalOpening = allAccs.reduce((sum, acc) => sum + acc.opening_balance_cents, 0);
-
-        // Total money actually assigned (across all time)
-        const db = await (await import('../db/client/sqlite')).getDatabase();
-        const assignedResult = await db.getFirstAsync<{ total: number }>('SELECT SUM(assigned_cents) as total FROM monthly_bucket_plans');
-        const allAssignedPlansRecord = await db.getAllAsync<MonthlyBucketPlan>('SELECT * FROM monthly_bucket_plans');
-
-        setUnassignedMoney(calculateUnassignedMoney(totalOpening, allTxs, allAssignedPlansRecord));
+        setUnassignedMoney(getReadyToAssign(totalOpening, allTxs, fetchedAllPlans));
         setLoading(false);
     }, [monthKey]);
 
@@ -64,6 +60,7 @@ export function usePlanning(monthKey: string) {
 
     return {
         plans,
+        allPlans,
         categories,
         categoryGroups,
         unassignedMoney,

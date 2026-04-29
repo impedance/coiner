@@ -10,10 +10,11 @@ import {
     Platform,
     ScrollView,
 } from 'react-native';
+import { router } from 'expo-router';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
-import { Category } from '../types';
-import { MonthlyBucketPlan } from '../types';
+import { Category, Transaction, MonthlyBucketPlan } from '../types';
+import { getBucketAvailable, getBucketState } from '../domain/budget/calculators';
 import { useSettings } from '../hooks/useSettings';
 import { transactionRepository } from '../db/repositories/TransactionRepository';
 
@@ -24,12 +25,14 @@ interface BucketSheetProps {
     allBuckets: Category[];
     allPlans: MonthlyBucketPlan[];
     unassignedMoney: number;
+    transactions: Transaction[];
+    monthKey: string;
     onClose: () => void;
     onAssign: (categoryId: string, amountCents: number) => Promise<void>;
     refreshData: () => Promise<void>;
 }
 
-type Tab = 'spend' | 'assign' | 'move' | 'topup';
+type Tab = 'spend' | 'assign' | 'move' | 'transactions';
 
 export const BucketSheet: React.FC<BucketSheetProps> = ({
     visible,
@@ -38,13 +41,13 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
     allBuckets,
     allPlans,
     unassignedMoney,
+    transactions,
+    monthKey,
     onClose,
     onAssign,
     refreshData,
 }) => {
     const [activeTab, setActiveTab] = useState<Tab>('spend');
-    const [spendAmount, setSpendAmount] = useState('');
-    const [topupAmount, setTopupAmount] = useState('');
     const [assignAmount, setAssignAmount] = useState('');
     const [moveAmount, setMoveAmount] = useState('');
     const [sourceId, setSourceId] = useState<string | null>(null);
@@ -57,84 +60,27 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
 
     const bucketsWithFunds = allBuckets.filter(b => {
         if (b.id === bucket?.id) return false;
-        const p = allPlans.find(pl => pl.category_id === b.id);
-        return (p?.assigned_cents ?? 0) > 0;
+        const available = getBucketAvailable(b.id, allPlans, transactions, monthKey);
+        return available > 0;
     });
+
+    const bucketTransactions = transactions
+        .filter(tx => tx.category_id === bucket?.id && tx.happened_at.startsWith(monthKey))
+        .sort((a, b) => b.happened_at.localeCompare(a.happened_at));
 
     const formatCents = (cents: number) =>
         (cents / 100).toLocaleString('ru-RU', { minimumFractionDigits: 0 }) + ' ₽';
-
-    const handleSpend = async () => {
-        setError('');
-        const amountCents = Math.round(parseFloat(spendAmount.replace(',', '.')) * 100);
-        if (isNaN(amountCents) || amountCents <= 0) {
-            setError('Введите корректную сумму');
-            return;
-        }
-        const accountId = getSetting('default_account_id', '');
-        if (!accountId) {
-            setError('Настройте счет по умолчанию в настройках');
-            return;
-        }
-        setSaving(true);
-        try {
-            await transactionRepository.create({
-                type: 'expense',
-                amount_cents: amountCents,
-                account_id: accountId,
-                category_id: bucket!.id,
-                happened_at: new Date().toISOString(),
-            });
-            await refreshData();
-            handleClose();
-        } catch (e) {
-            setError('Ошибка при сохранении');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleTopup = async () => {
-        setError('');
-        const amountCents = Math.round(parseFloat(topupAmount.replace(',', '.')) * 100);
-        if (isNaN(amountCents) || amountCents <= 0) {
-            setError('Введите корректную сумму');
-            return;
-        }
-        const accountId = getSetting('default_account_id', '');
-        if (!accountId) {
-            setError('Настройте счет по умолчанию в настройках');
-            return;
-        }
-        setSaving(true);
-        try {
-            await transactionRepository.create({
-                type: 'income',
-                amount_cents: amountCents,
-                account_id: accountId,
-                category_id: bucket!.id,
-                happened_at: new Date().toISOString(),
-            });
-            await onAssign(bucket!.id, currentAssigned + amountCents);
-            await refreshData();
-            handleClose();
-        } catch (e) {
-            setError('Ошибка при сохранении');
-        } finally {
-            setSaving(false);
-        }
-    };
 
     const handleAssign = async () => {
         setError('');
         const newAmountCents = Math.round(parseFloat(assignAmount) * 100);
         if (isNaN(newAmountCents) || newAmountCents < 0) {
-            setError('Введите корректную сумму');
+            setError('Enter a valid amount');
             return;
         }
         const delta = newAmountCents - currentAssigned;
         if (delta > unassignedMoney) {
-            setError('Недостаточно нераспределённых средств');
+            setError('Not enough unassigned funds');
             return;
         }
         setSaving(true);
@@ -149,22 +95,23 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
     const handleMove = async () => {
         setError('');
         if (!sourceId) {
-            setError('Выберите источник');
+            setError('Select a source bucket');
             return;
         }
         const deltaCents = Math.round(parseFloat(moveAmount) * 100);
         if (isNaN(deltaCents) || deltaCents <= 0) {
-            setError('Введите корректную сумму');
+            setError('Enter a valid amount');
             return;
         }
-        const sourcePlan = allPlans.find(p => p.category_id === sourceId);
-        const sourceAssigned = sourcePlan?.assigned_cents ?? 0;
-        if (deltaCents > sourceAssigned) {
-            setError('Недостаточно средств в источнике');
+        const sourceAvailable = getBucketAvailable(sourceId, allPlans, transactions, monthKey);
+        if (deltaCents > sourceAvailable) {
+            setError('Insufficient funds in source');
             return;
         }
         setSaving(true);
         try {
+            const sourcePlan = allPlans.find(p => p.category_id === sourceId && p.month_key === monthKey);
+            const sourceAssigned = sourcePlan?.assigned_cents ?? 0;
             await onAssign(sourceId, sourceAssigned - deltaCents);
             await onAssign(bucket!.id, currentAssigned + deltaCents);
             onClose();
@@ -175,8 +122,6 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
 
     const handleClose = () => {
         setError('');
-        setSpendAmount('');
-        setTopupAmount('');
         setAssignAmount('');
         setMoveAmount('');
         setSourceId(null);
@@ -205,9 +150,14 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
 
                         {/* Title */}
                         <Text style={styles.title}>{bucket.name}</Text>
-                        <Text style={styles.subtitle}>
-                            Назначено: {formatCents(currentAssigned)}
-                        </Text>
+                        <View style={styles.summaryRow}>
+                            <Text style={styles.subtitle}>
+                                Assigned: {formatCents(getBucketState(bucket.id, allPlans, transactions, monthKey).assignedCents)}
+                            </Text>
+                            <Text style={styles.subtitle}>
+                                Available: {formatCents(getBucketState(bucket.id, allPlans, transactions, monthKey).availableCents)}
+                            </Text>
+                        </View>
 
                         {/* Tabs */}
                         <View style={styles.tabs}>
@@ -216,7 +166,7 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                                 onPress={() => setActiveTab('spend')}
                             >
                                 <Text style={[styles.tabText, activeTab === 'spend' && styles.tabTextActive]}>
-                                    Трата
+                                    Spend
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -224,7 +174,7 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                                 onPress={() => setActiveTab('assign')}
                             >
                                 <Text style={[styles.tabText, activeTab === 'assign' && styles.tabTextActive]}>
-                                    Назначить
+                                    Assign
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -232,15 +182,15 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                                 onPress={() => setActiveTab('move')}
                             >
                                 <Text style={[styles.tabText, activeTab === 'move' && styles.tabTextActive]}>
-                                    Двигать
+                                    Move
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.tab, activeTab === 'topup' && styles.tabActive]}
-                                onPress={() => setActiveTab('topup')}
+                                style={[styles.tab, activeTab === 'transactions' && styles.tabActive]}
+                                onPress={() => setActiveTab('transactions')}
                             >
-                                <Text style={[styles.tabText, activeTab === 'topup' && styles.tabTextActive]}>
-                                    Доход
+                                <Text style={[styles.tabText, activeTab === 'transactions' && styles.tabTextActive]}>
+                                    History
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -249,26 +199,16 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                         {activeTab === 'spend' && (
                             <View style={styles.tabContent}>
                                 <Text style={styles.hint}>
-                                    Внести трату из счета по умолчанию
+                                    Recording an expense will reduce the available balance in this bucket.
                                 </Text>
-                                <TextInput
-                                    style={styles.input}
-                                    keyboardType="numeric"
-                                    placeholder="Сумма траты"
-                                    placeholderTextColor={Colors.textSecondary}
-                                    value={spendAmount}
-                                    onChangeText={text => { setSpendAmount(text); setError(''); }}
-                                    autoFocus
-                                />
-                                {error ? <Text style={styles.error}>{error}</Text> : null}
                                 <TouchableOpacity
-                                    style={[styles.primaryButton, saving && styles.disabled]}
-                                    onPress={handleSpend}
-                                    disabled={saving}
+                                    style={styles.primaryButton}
+                                    onPress={() => {
+                                        onClose();
+                                        router.push(`/transaction/new?type=expense&categoryId=${bucket.id}`);
+                                    }}
                                 >
-                                    <Text style={styles.primaryButtonText}>
-                                        {saving ? 'Сохраняю…' : 'Внести трату'}
-                                    </Text>
+                                    <Text style={styles.primaryButtonText}>Record Expense</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -304,13 +244,12 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                         {/* Move Tab */}
                         {activeTab === 'move' && (
                             <ScrollView style={styles.tabContent} keyboardShouldPersistTaps="handled">
-                                <Text style={styles.label}>Откуда</Text>
+                                <Text style={styles.label}>From</Text>
                                 {bucketsWithFunds.length === 0 ? (
-                                    <Text style={styles.empty}>Нет бакетов с доступными средствами</Text>
+                                    <Text style={styles.empty}>No buckets with available funds</Text>
                                 ) : (
                                     bucketsWithFunds.map(b => {
-                                        const p = allPlans.find(pl => pl.category_id === b.id);
-                                        const avail = p?.assigned_cents ?? 0;
+                                        const avail = getBucketAvailable(b.id, allPlans, transactions, monthKey);
                                         return (
                                             <TouchableOpacity
                                                 key={b.id}
@@ -324,11 +263,11 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                                     })
                                 )}
 
-                                <Text style={[styles.label, { marginTop: 16 }]}>Куда: {bucket.name}</Text>
+                                <Text style={[styles.label, { marginTop: 16 }]}>To: {bucket.name}</Text>
                                 <TextInput
                                     style={styles.input}
                                     keyboardType="numeric"
-                                    placeholder="Сумма"
+                                    placeholder="Amount"
                                     placeholderTextColor={Colors.textSecondary}
                                     value={moveAmount}
                                     onChangeText={text => { setMoveAmount(text); setError(''); }}
@@ -340,37 +279,36 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                                     disabled={saving}
                                 >
                                     <Text style={styles.primaryButtonText}>
-                                        {saving ? 'Перемещаю…' : 'Переместить'}
+                                        {saving ? 'Moving…' : 'Move Money'}
                                     </Text>
                                 </TouchableOpacity>
                             </ScrollView>
                         )}
 
-                        {/* Topup Tab */}
-                        {activeTab === 'topup' && (
+                        {/* History Tab */}
+                        {activeTab === 'transactions' && (
                             <View style={styles.tabContent}>
-                                <Text style={styles.hint}>
-                                    Добавить доход и сразу зачислить в бакет
-                                </Text>
-                                <TextInput
-                                    style={styles.input}
-                                    keyboardType="numeric"
-                                    placeholder="Сумма дохода"
-                                    placeholderTextColor={Colors.textSecondary}
-                                    value={topupAmount}
-                                    onChangeText={text => { setTopupAmount(text); setError(''); }}
-                                    autoFocus
-                                />
-                                {error ? <Text style={styles.error}>{error}</Text> : null}
-                                <TouchableOpacity
-                                    style={[styles.primaryButton, saving && styles.disabled, { backgroundColor: Colors.income }]}
-                                    onPress={handleTopup}
-                                    disabled={saving}
-                                >
-                                    <Text style={styles.primaryButtonText}>
-                                        {saving ? 'Зачисляю…' : 'Пополнить бакет'}
-                                    </Text>
-                                </TouchableOpacity>
+                                <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+                                    {bucketTransactions.length === 0 ? (
+                                        <Text style={styles.empty}>No transactions for this bucket yet.</Text>
+                                    ) : (
+                                        bucketTransactions.map(tx => (
+                                            <View key={tx.id} style={styles.transactionRow}>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.transactionNote} numberOfLines={1}>
+                                                        {tx.note || 'No note'}
+                                                    </Text>
+                                                    <Text style={styles.transactionDate}>
+                                                        {new Date(tx.happened_at).toLocaleDateString()}
+                                                    </Text>
+                                                </View>
+                                                <Text style={styles.transactionAmount}>
+                                                    -{formatCents(tx.amount_cents)}
+                                                </Text>
+                                            </View>
+                                        ))
+                                    )}
+                                </ScrollView>
                             </View>
                         )}
                     </View>
@@ -418,6 +356,10 @@ const styles = StyleSheet.create({
     },
     subtitle: {
         ...Typography.small,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         marginBottom: 20,
     },
     tabs: {
@@ -514,4 +456,28 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
         marginBottom: 12,
     },
+    transactionRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+    },
+    transactionNote: {
+        ...Typography.bodyMedium,
+        fontSize: 14,
+        color: Colors.text,
+    },
+    transactionDate: {
+        ...Typography.small,
+        color: Colors.textSecondary,
+        fontSize: 12,
+    },
+    transactionAmount: {
+        ...Typography.bodyBold,
+        color: Colors.expense,
+        fontSize: 14,
+    },
 });
+

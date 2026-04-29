@@ -3,6 +3,11 @@ import { MonthlyBucketPlan } from '../../types';
 import * as Crypto from 'expo-crypto';
 
 export class MonthlyBucketPlanRepository {
+    async getAll(): Promise<MonthlyBucketPlan[]> {
+        const db = await getDatabase();
+        return db.getAllAsync<MonthlyBucketPlan>('SELECT * FROM monthly_bucket_plans');
+    }
+
     async getByMonth(monthKey: string): Promise<MonthlyBucketPlan[]> {
         const db = await getDatabase();
         return db.getAllAsync<MonthlyBucketPlan>(
@@ -40,6 +45,27 @@ export class MonthlyBucketPlanRepository {
                 plan.planned_cents ?? 0,
                 plan.assigned_cents ?? 0,
                 plan.carryover_mode ?? 'carry',
+                now,
+                now
+            );
+        }
+    }
+
+    async carryForward(fromMonth: string, toMonth: string): Promise<void> {
+        const db = await getDatabase();
+        const existingPlans = await this.getByMonth(fromMonth);
+        const now = new Date().toISOString();
+
+        for (const plan of existingPlans) {
+            const id = Crypto.randomUUID();
+            await db.runAsync(
+                'INSERT OR IGNORE INTO monthly_bucket_plans (id, month_key, category_id, planned_cents, assigned_cents, carryover_mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                id,
+                toMonth,
+                plan.category_id,
+                plan.planned_cents,
+                0, // Start with 0 assigned in new month
+                plan.carryover_mode,
                 now,
                 now
             );

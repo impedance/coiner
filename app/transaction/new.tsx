@@ -4,12 +4,14 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useDataSelection } from '../../src/hooks/useData';
 import { useSettings } from '../../src/hooks/useSettings';
 import { transactionRepository } from '../../src/db/repositories/TransactionRepository';
+import { getBucketAvailable } from '../../src/domain/budget/calculators';
+import { Colors } from '../../src/theme';
 
 type TransactionType = 'expense' | 'income' | 'transfer';
 
 export default function NewTransactionScreen() {
-    const { type: initialType } = useLocalSearchParams<{ type: TransactionType }>();
-    const { accounts, categories, goals, moneySteps, isReady, refresh } = useDataSelection();
+    const { type: initialType, categoryId: initialCategoryId } = useLocalSearchParams<{ type: TransactionType; categoryId: string }>();
+    const { accounts, categories, plans, transactions, goals, moneySteps, isReady, refresh } = useDataSelection();
     const { getSetting } = useSettings();
 
     const [type, setType] = useState<TransactionType>(initialType || 'expense');
@@ -17,12 +19,14 @@ export default function NewTransactionScreen() {
     const [amount, setAmount] = useState('');
     const [accountId, setAccountId] = useState('');
     const [toAccountId, setToAccountId] = useState('');
-    const [categoryId, setCategoryId] = useState('');
+    const [categoryId, setCategoryId] = useState(initialCategoryId || '');
     const [note, setNote] = useState('');
     const [goalId, setGoalId] = useState<string | null>(null);
     const [moneyStepId, setMoneyStepId] = useState<string | null>(null);
 
     const { settings, loading: settingsLoading } = useSettings();
+
+    const monthKey = new Date().toISOString().substring(0, 7);
 
     useEffect(() => {
         if (!accountId && !settingsLoading) {
@@ -48,10 +52,14 @@ export default function NewTransactionScreen() {
             return;
         }
 
+        const amountCents = Math.round(parseFloat(amount.replace(',', '.')) * 100);
+        const available = getBucketAvailable(categoryId, plans, transactions, monthKey);
+        const isOverspent = type === 'expense' && amountCents > available;
+
         try {
             await transactionRepository.create({
                 type,
-                amount_cents: Math.round(parseFloat(amount.replace(',', '.')) * 100),
+                amount_cents: amountCents,
                 account_id: accountId,
                 to_account_id: type === 'transfer' ? toAccountId : undefined,
                 category_id: type !== 'transfer' ? categoryId : undefined,
@@ -63,13 +71,23 @@ export default function NewTransactionScreen() {
             await refresh();
             
             if (type === 'income') {
-                const amountCents = Math.round(parseFloat(amount.replace(',', '.')) * 100);
                 Alert.alert(
                     'Income Recorded',
                     'Would you like to assign this money to your buckets now?',
                     [
                         { text: 'Later', onPress: () => router.back() },
                         { text: 'Assign Now', onPress: () => router.replace(`/transaction/income-wizard?amountCents=${amountCents}`) }
+                    ]
+                );
+            } else if (isOverspent) {
+                Alert.alert(
+                    'Overspent!',
+                    'You spent more than you had in this bucket. Move money to cover it?',
+                    [
+                        { text: 'Later', onPress: () => router.back() },
+                        { text: 'Move Money', onPress: () => {
+                            router.replace({ pathname: '/', params: { categoryId } });
+                        }}
                     ]
                 );
             } else {
@@ -196,20 +214,49 @@ export default function NewTransactionScreen() {
             {/* Category Selection (for expense/income) + Optional Links */}
             {step === 4 && type !== 'transfer' && (
                 <View style={styles.step}>
-                    <Text style={styles.label}>Which category?</Text>
                     <View style={styles.grid}>
-                        {filteredCategories.map(cat => (
-                            <TouchableOpacity
-                                key={cat.id}
-                                style={[styles.gridOption, categoryId === cat.id && styles.optionSelected]}
-                                onPress={() => setCategoryId(cat.id)}
-                            >
-                                <Text style={[styles.optionText, categoryId === cat.id && styles.optionTextSelected]}>
-                                    {cat.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                        {filteredCategories.map(cat => {
+                            const available = getBucketAvailable(cat.id, plans, transactions, monthKey);
+                            const isSelected = categoryId === cat.id;
+                            
+                            return (
+                                <TouchableOpacity
+                                    key={cat.id}
+                                    style={[styles.gridOption, isSelected && styles.optionSelected]}
+                                    onPress={() => setCategoryId(cat.id)}
+                                >
+                                    <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                                        {cat.name}
+                                    </Text>
+                                    <Text style={[styles.availableText, isSelected && styles.availableTextSelected]}>
+                                        {(available / 100).toFixed(0)} ₽
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
+
+                    {categoryId && type === 'expense' && amount && (
+                        <View style={styles.previewContainer}>
+                            {(() => {
+                                const currentAmount = Math.round(parseFloat(amount.replace(',', '.')) * 100);
+                                const available = getBucketAvailable(categoryId, plans, transactions, monthKey);
+                                const remaining = available - currentAmount;
+                                const isWarning = remaining < 0;
+                                
+                                return (
+                                    <View style={[styles.previewCard, isWarning && styles.warningCard]}>
+                                        <Text style={[styles.previewLabel, isWarning && styles.warningLabel]}>
+                                            {isWarning ? '⚠️ Overspending' : 'Remaining After'}
+                                        </Text>
+                                        <Text style={[styles.previewAmount, isWarning && styles.warningAmount]}>
+                                            {(remaining / 100).toLocaleString('ru-RU')} ₽
+                                        </Text>
+                                    </View>
+                                );
+                            })()}
+                        </View>
+                    )}
 
                     {/* Optional Goal Linking */}
                     {goals.length > 0 && (
@@ -448,6 +495,47 @@ const styles = StyleSheet.create({
     emptyText: {
         color: '#FF3B30',
         marginBottom: 10,
+    },
+    availableText: {
+        fontSize: 12,
+        color: '#8E8E93',
+        marginTop: 2,
+    },
+    availableTextSelected: {
+        color: 'rgba(255,255,255,0.7)',
+    },
+    previewContainer: {
+        marginTop: 16,
+    },
+    previewCard: {
+        backgroundColor: '#F2F2F7',
+        padding: 16,
+        borderRadius: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    warningCard: {
+        backgroundColor: '#FF3B3015',
+        borderWidth: 1,
+        borderColor: '#FF3B30',
+    },
+    previewLabel: {
+        fontSize: 14,
+        color: '#3A3A3C',
+        fontWeight: '500',
+    },
+    warningLabel: {
+        color: '#FF3B30',
+        fontWeight: '700',
+    },
+    previewAmount: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#007AFF',
+    },
+    warningAmount: {
+        color: '#FF3B30',
     },
     transferSummary: {
         backgroundColor: '#F2F2F7',
