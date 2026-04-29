@@ -13,6 +13,8 @@ System-of-record map: `docs/index.md`.
 - Agent smoke (optional): `make agent-smoke`
 - Preflight: `make preflight`
 - Strict smoke: `make smoke STRICT=1`
+- Run UI (Web): `make run`
+- Start Expo: `make start`
 - Harness info (optional): `make doctor`
 
 ## 3) Non-negotiable invariants

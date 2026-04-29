@@ -6,7 +6,12 @@ FAIL_FAST ?= 0
 PYTHON ?= python3
 BLACKBOX_CMD ?=
 
-.PHONY: smoke preflight lint typecheck test structural agent-smoke doctor
+.PHONY: smoke preflight lint typecheck test structural agent-smoke doctor run start
+run:
+	npm run web
+
+start:
+	npm start
 smoke: structural lint test
 
 preflight: structural lint typecheck test
