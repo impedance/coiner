@@ -14,6 +14,7 @@ export function usePlanning(monthKey: string) {
     const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
     const [unassignedMoney, setUnassignedMoney] = useState(0);
     const [accounts, setAccounts] = useState<Account[]>([]);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
 
     const refresh = useCallback(async () => {
@@ -32,6 +33,7 @@ export function usePlanning(monthKey: string) {
         setCategories(allCats);
         setCategoryGroups(allGroups);
         setAccounts(allAccs);
+        setTransactions(allTxs);
 
         const totalOpening = allAccs.reduce((sum, acc) => sum + acc.opening_balance_cents, 0);
         setUnassignedMoney(getReadyToAssign(totalOpening, allTxs, fetchedAllPlans));
@@ -66,6 +68,7 @@ export function usePlanning(monthKey: string) {
         categories,
         categoryGroups,
         accounts,
+        transactions,
         unassignedMoney,
         loading,
         assignMoney,

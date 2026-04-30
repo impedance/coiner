@@ -26,7 +26,7 @@ import { monthlyBucketPlanRepository } from '../../src/db/repositories/MonthlyBu
 import { categoryRepository } from '../../src/db/repositories/CategoryRepository';
 
 export default function BucketsScreen() {
-    const { isReady: isDataReady, accounts, transactions } = useDataSelection();
+    const { isReady: isDataReady, accounts } = useDataSelection();
     const { categoryId: autoOpenCategoryId } = useLocalSearchParams<{ categoryId: string }>();
 
     const monthKey = useMemo(() => {
@@ -34,7 +34,17 @@ export default function BucketsScreen() {
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }, []);
 
-    const { unassignedMoney, plans, allPlans, categories, categoryGroups, loading: planningLoading, assignMoney, refresh } = usePlanning(monthKey);
+    const { 
+        unassignedMoney, 
+        plans, 
+        allPlans, 
+        categories, 
+        categoryGroups, 
+        transactions,
+        loading: planningLoading, 
+        assignMoney, 
+        refresh 
+    } = usePlanning(monthKey);
 
     const prevMonthKey = useMemo(() => {
         const d = new Date();
@@ -59,6 +69,16 @@ export default function BucketsScreen() {
     const [sheetBucket, setSheetBucket] = useState<Category | null>(null);
     const [isAddingBucket, setIsAddingBucket] = useState(false);
     const [newBucketName, setNewBucketName] = useState('');
+
+    useEffect(() => {
+        if (Platform.OS === 'web' && isAddingBucket) {
+            const handleKeyDown = (e: any) => {
+                if (e.key === 'Escape') setIsAddingBucket(false);
+            };
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [isAddingBucket]);
 
     useEffect(() => {
         if (autoOpenCategoryId && categories.length > 0) {
@@ -284,7 +304,11 @@ export default function BucketsScreen() {
                                                 <View style={styles.bucketActions}>
                                                     <TouchableOpacity 
                                                         style={styles.bucketActionIcon}
-                                                        onPress={() => handleDeleteBucket(cat)}
+                                                        onPress={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteBucket(cat);
+                                                        }}
+                                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                                     >
                                                         <Ionicons name="trash-outline" size={16} color={Colors.textSecondary} />
                                                     </TouchableOpacity>
@@ -338,6 +362,8 @@ export default function BucketsScreen() {
                             value={newBucketName}
                             onChangeText={setNewBucketName}
                             autoFocus
+                            onSubmitEditing={confirmAddBucket}
+                            blurOnSubmit={false}
                         />
                         <View style={styles.modalActions}>
                             <TouchableOpacity style={styles.modalButton} onPress={() => setIsAddingBucket(false)}>

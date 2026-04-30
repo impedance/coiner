@@ -38,6 +38,16 @@ export default function NewTransactionScreen() {
         }
     }, [isReady, accounts, getSetting]);
 
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            const handleKeyDown = (e: any) => {
+                if (e.key === 'Escape') router.back();
+            };
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }
+    }, []);
+
     const filteredCategories = categories.filter(c => c.kind === type || (type === 'transfer' && c.kind === 'expense'));
 
     const handleSave = async () => {
@@ -187,6 +197,7 @@ export default function NewTransactionScreen() {
                             placeholderTextColor={Colors.textSecondary}
                             value={note}
                             onChangeText={setNote}
+                            onSubmitEditing={handleSave}
                         />
 
                         <TouchableOpacity style={styles.primaryBtn} onPress={handleSave}>

@@ -82,6 +82,16 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
         }
     }, [visible, accounts, getSetting]);
 
+    React.useEffect(() => {
+        if (Platform.OS === 'web' && visible) {
+            const handleKeyDown = (e: any) => {
+                if (e.key === 'Escape') handleClose();
+            };
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [visible]);
+
     const currentAssigned = plan?.assigned_cents ?? 0;
 
     const bucketsWithFunds = allBuckets.filter(b => {
@@ -320,6 +330,7 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                                         placeholderTextColor={Colors.textSecondary}
                                         value={spendNote}
                                         onChangeText={setSpendNote}
+                                        onSubmitEditing={handleSpend}
                                     />
                                     
                                     <Text style={styles.label}>Account</Text>
@@ -368,6 +379,7 @@ export const BucketSheet: React.FC<BucketSheetProps> = ({
                                         value={assignAmount}
                                         onChangeText={text => { setAssignAmount(text); setError(''); }}
                                         autoFocus
+                                        onSubmitEditing={handleAssign}
                                     />
                                     <NumberPad 
                                         value={assignAmount} 
